@@ -31,10 +31,10 @@ const $=id=>document.getElementById(id);
 const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 
 const HAWK=['#08306b','#08519c','#2171b5','#4292c6','#6baed6','#9ecae1','#c6dbef','#deebf7','#fee0d2','#fcbba1','#fc9272','#fb6a4a','#ef3b2c','#cb181d','#a50f15','#67000d'];
-const PALS={gtb:['#0b3d2a','#17663f','#2a9358','#58bd84','#9adfc0','#c6f0ec','#86d3e0','#46a6d6','#2a74c6','#1b4c9b','#0f285e'],
-  vp:['#2a0f4f','#46207e','#6a35a8','#9258c6','#c191dc','#f0d9f0','#f4a8cf','#e872aa','#cf4588','#a3216a','#6b0f45'],
-  gr:[...Array(11).keys()].map(i=>{const t=i/10,g=Math.round(18+232*Math.pow(t,0.72));const h=g.toString(16).padStart(2,'0');return '#'+h+h+h;})};
-const PALNAME={gtb:['Grün','Blau'],vp:['Violett','Pink'],gr:['Dunkel','Hell']};
+const PALS={gtb:['#e3ef7a','#c2e26a','#97d05f','#6bbd63','#47a86e','#2f9d8f','#2a8fae','#2a76bf','#255cb0','#1d4391','#142c66'],
+  vp:['#ffd1e6','#f9a8cc','#ef7fb3','#de5c9f','#c64592','#a93a93','#8b3594','#6f3191','#562b88','#3f2378','#2a1a5c'],
+  yp:['#fff27a','#f0e05c','#d8cf4c','#b9bf49','#97ae50','#73a05a','#4f9064','#327f6b','#1d6c6c','#105a66','#0a4652']};
+const PALNAME={gtb:['Gelbgrün','Blau'],vp:['Pink','Violett'],yp:['Gelb','Petrol']};
 const hex=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16));
 const HK=HAWK.map(hex);let BB=PALS.gtb.map(hex);
 function ramp(C,t){t=Math.max(0,Math.min(1,t));const x=t*(C.length-1),i=Math.min(C.length-2,Math.floor(x)),f=x-i;return C[i].map((c,k)=>Math.round(c+(C[i+1][k]-c)*f));}
@@ -149,7 +149,7 @@ on('#heatMode button',b=>{st.hm=b.dataset.h;drawSeg();});
 on('#segVar button',b=>{st.sv=b.dataset.s;drawCum();});
 $('reset').onclick=()=>{Object.assign(st,DEF);BB=PALS.gtb.map(hex);syncControls();save();all();};
 const slide=(id,fn)=>$(id).oninput=e=>{st[id]=+e.target.value;if(id==='r0'&&st.r0+st.rl-1>2025)st.rl=2026-st.r0;if(id==='rl'&&st.r0+st.rl-1>2025)st.r0=2026-st.rl;syncControls();save();fn();};
-slide('r0',()=>{draw();drawJG();drawCharts();drawSeg();});slide('rl',()=>{draw();drawJG();drawCharts();drawSeg();});
+slide('r0',()=>{draw();drawLand();drawJG();drawCharts();drawSeg();});slide('rl',()=>{draw();drawLand();drawJG();drawCharts();drawSeg();});
 slide('ys',draw);slide('gam',draw);slide('sy',draw);slide('sw',draw);slide('sm',drawCharts);slide('sm2',drawSeg);
 $('segStart').innerHTML=MON.map((m,i)=>`<option value="${Math.round(monthStartWeek[i])}">1. ${m}</option>`).join('');
 $('segStart').onchange=e=>{st.s0=+e.target.value;save();drawSeg();};
@@ -369,7 +369,108 @@ function drawCharts(){
    add({years:q.years,title:'Spätsommer-Anteil Abfluss',sub:'% des Jahresabflusses in Juli–September, wenn Schnee- und Gletscherschmelze den Fluss speisen',series:[{name:'Jul–Sep',v:q.vals,c:c3}],vf:x=>x.toFixed(0)+' %',sm:Math.min(st.sm,9)});}
 }
 
-function all(){if(!has('T')&&!has('P'))return;setWhere();updateVarButtons();draw();drawJG();drawScatter();drawCum();drawSeg();drawCharts();}
+/* ---------- Landschaft: indicators for landscape planning ---------- */
+const LAPSE=0.55; // °C per 100 m (mean annual lapse rate, Swiss Alps)
+const ZONES=[['kollin',0,600],['montan',600,1300],['subalpin',1300,1900],['alpin',1900,2600],['nival',2600,4600]];
+const mean=a=>{const b=a.filter(x=>x!=null&&isFinite(x));return b.length?b.reduce((s,x)=>s+x,0)/b.length:null;};
+function cmp(years,vals,a,b,rec){const A=[],B=[];years.forEach((y,i)=>{if(y>=a&&y<=b)A.push(vals[i]);if(y>=rec[0]&&y<=rec[1])B.push(vals[i]);});return [mean(A),mean(B),A.filter(x=>x!=null).length,B.filter(x=>x!=null).length];}
+const RECENT=[2016,2025];
+const fmtSign=(x,d=1)=>x==null?'–':(x>0?'+':x<0?'−':'±')+Math.abs(x).toFixed(d);
+const doyD=x=>x==null?'–':fD(new Date(Date.UTC(2001,0,1+Math.round(x))));
+function seasonMean(k,y,weeks){const v=V[k];const vals=[];for(const [yy,w] of weeks){const r=v.g[yy-v.y0];if(r&&r[w]!=null)vals.push(r[w]);}return vals.length>=weeks.length*0.8?mean(vals):null;}
+function landData(){
+  const D={};
+  if(has('T')){const T=V.T,ys=[],ta=[],h0=[];
+    for(let y=T.y0;y<=Math.min(T.y1,2025);y++){const r=T.g[y-T.y0];if(r.filter(x=>x!=null).length<48)continue;ys.push(y);ta.push(mean(r));
+      const w=[];for(let k=48;k<52;k++)w.push([y-1,k]);for(let k=0;k<9;k++)w.push([y,k]);const tw=seasonMean('T',y,w);h0.push(tw==null||ELEV.T==null?null:ELEV.T+tw/LAPSE*100);}
+    D.ty=ys;D.ta=ta;D.h0=h0;}
+  if(has('P')&&has('E')){const P=V.P,E=V.E,ys=[],bal=[],mon={};
+    for(let y=E.y0;y<=Math.min(E.y1,2025);y++){const rp=P.g[y-P.y0],re=E.g[y-E.y0];if(!rp||!re)continue;const m=new Array(12).fill(0),c=new Array(12).fill(0);let s=0,n=0;
+      for(let w=0;w<NW;w++){if(rp[w]==null||re[w]==null)continue;const mo=wDate(w+0.5).getUTCMonth();m[mo]+=rp[w]-re[w];c[mo]++;if(mo>=5&&mo<=7){s+=rp[w]-re[w];n++;}}
+      mon[y]=m.map((x,i)=>c[i]>=3?x:null);if(n>=11){ys.push(y);bal.push(s);}}
+    D.by=ys;D.bal=bal;D.mon=mon;}
+  if(has('Q')){const Q=V.Q,ys=[],mn=[],tw=[],q347=[];
+    for(let y=Q.y0;y<=Math.min(Q.y1,2025);y++){const r=Q.g[y-Q.y0];if(!r||r.filter(x=>x!=null).length<50)continue;let m=1e9,wm=0;r.forEach((x,w)=>{if(x!=null&&x<m){m=x;wm=w;}});
+      const s=r.filter(x=>x!=null).sort((a,b)=>a-b);ys.push(y);mn.push(m);tw.push(wm*7+3);q347.push(pctl(s,0.05));}
+    D.qy=ys;D.qmin=mn;D.qtw=tw;D.q347=q347;}
+  return D;
+}
+/* standardised 3-month climatic water balance (SPEI-like, z-scores per calendar month vs reference) */
+function speiGrid(mon,a,b){
+  const ys=Object.keys(mon).map(Number).sort((x,y)=>x-y);const acc={};
+  for(const y of ys)acc[y]=mon[y].map((_,m)=>{let s=0;for(let k=0;k<3;k++){let mm=m-k,yy=y;if(mm<0){mm+=12;yy--;}const v=mon[yy]&&mon[yy][mm];if(v==null)return null;s+=v;}return s;});
+  const z={};for(let m=0;m<12;m++){let vals=ys.filter(y=>y>=a&&y<=b).map(y=>acc[y][m]).filter(x=>x!=null);if(vals.length<8)vals=ys.map(y=>acc[y][m]).filter(x=>x!=null);
+    const mu=mean(vals),sd=Math.sqrt(mean(vals.map(x=>(x-mu)**2))||1);for(const y of ys){(z[y]=z[y]||new Array(12).fill(null))[m]=acc[y][m]==null?null:(acc[y][m]-mu)/sd;}}
+  return {ys,z};
+}
+function tiles(D){
+  const out=[];const [a,b]=refFor(has('T')?'T':'P');const ref=`${a}–${b}`,rec=`${RECENT[0]}–${RECENT[1]}`;
+  if(D.ty){const [A,B]=cmp(D.ty,D.ta,a,b,RECENT);if(A!=null&&B!=null){const dT=B-A;out.push(['Temperatur',`${fmtSign(dT)} °C`,`Jahresmittel ${N.T}, ${rec} gegenüber ${ref}`]);
+    out.push(['Höhenverschiebung',`≈ ${fmtSign(dT/LAPSE*100,0)} m`,`So viel höher liegt heute das Klima von ${ref} (ΔT ÷ ${LAPSE} °C/100 m)`]);}
+    const [h1,h2]=cmp(D.ty,D.h0,a,b,RECENT);if(h1!=null&&h2!=null)out.push(['Nullgradgrenze Winter',`${Math.round(h1/10)*10} → ${Math.round(h2/10)*10} m`,`Dez–Feb, geschätzt aus ${N.T}`]);}
+  const A=V.T&&V.T.ann;
+  if(A&&A.year.length){const vl=cmp(A.year,A.vl,a,b,RECENT),vs=cmp(A.year,A.vs,a,b,RECENT);if(vl[0]!=null&&vl[1]!=null)out.push(['Vegetationsperiode',`${fmtSign(vl[1]-vl[0],0)} Tage`,`${Math.round(vl[0])} → ${Math.round(vl[1])} Tage, Beginn ${doyD(vs[0])} → ${doyD(vs[1])}`]);
+    const ho=cmp(A.year,A.hot,a,b,RECENT),tr=cmp(A.year,A.trop,a,b,RECENT);if(ho[2]>=5&&ho[3]>=5)out.push(['Hitzetage ≥ 30 °C',`${ho[0].toFixed(1)} → ${ho[1].toFixed(1)}`,`pro Jahr${tr[2]>=5?` · Tropennächte ${tr[0].toFixed(1)} → ${tr[1].toFixed(1)}`:''}`]);
+    const fa=cmp(A.year,A.frostAfter,a,b,RECENT);if(fa[2]>=5&&fa[3]>=5)out.push(['Spätfrost',`${fa[0].toFixed(1)} → ${fa[1].toFixed(1)}`,'Frosttage nach Vegetationsbeginn pro Jahr']);}
+  if(D.by){const [x,y]=cmp(D.by,D.bal,a,b,RECENT);if(x!=null&&y!=null)out.push(['Sommer-Wasserbilanz',`${fmtSign(y-x,0)} mm`,`Niederschlag − Verdunstung Jun–Aug: ${Math.round(x)} → ${Math.round(y)} mm`]);}
+  if(D.qy){const [qa,qb]=refFor('Q');const r=cmp(D.qy,D.qmin,qa,qb,[Math.max(qb+1,RECENT[0]),RECENT[1]]);if(r[0]&&r[1]&&r[3]>=3)out.push(['Niedrigwasser',`${fmtSign((r[1]/r[0]-1)*100,0)} %`,`tiefstes Wochenmittel ${N.Q}: ${r[0].toFixed(1)} → ${r[1].toFixed(1)} m³/s (${qa}–${qb} vs. ${Math.max(qb+1,RECENT[0])}–${RECENT[1]})`]);}
+  return out;
+}
+function drawProfile(el,dh){
+  const Wd=360,Ht=320,L=46,T=12,B=26,ph=Ht-T-B,lo=200,hi=3600,Y=h=>T+(1-(h-lo)/(hi-lo))*ph,cw=110,x1=L+30,x2=x1+cw+50;
+  const fills=['#1a1a1a','#232323','#2c2c2c','#363636','#444444'];
+  let s=`<svg viewBox="0 0 ${Wd} ${Ht}" role="img" aria-label="Höhenstufen Referenz und heute">`;
+  [500,1000,1500,2000,2500,3000,3500].forEach(h=>{s+=`<line x1="${L}" x2="${Wd-6}" y1="${Y(h)}" y2="${Y(h)}" stroke="var(--grid)"/><text x="${L-6}" y="${Y(h)+3.5}" text-anchor="end">${h}</text>`;});
+  const col=(x,shift,label)=>{let t='';ZONES.forEach(([n,a,b],i)=>{const ya=Y(Math.min(hi,b+(i<4?shift:0))),yb=Y(Math.max(lo,a+(i>0?shift:0)));if(yb<=T)return;t+=`<rect x="${x}" y="${Math.max(T,ya).toFixed(1)}" width="${cw}" height="${(yb-Math.max(T,ya)).toFixed(1)}" fill="${fills[i]}" stroke="var(--surface)" stroke-width="2"/>`;
+    const ym=(Math.max(T,ya)+yb)/2;if(yb-Math.max(T,ya)>14)t+=`<text class="lab" x="${x+cw/2}" y="${ym+3.5}" text-anchor="middle">${n}</text>`;});
+    t+=`<text class="lab" x="${x+cw/2}" y="${Ht-8}" text-anchor="middle">${label}</text>`;return t;};
+  const [a,b]=refFor('T');s+=col(x1,0,`${a}–${b}`)+col(x2,dh,`${RECENT[0]}–${RECENT[1]}`);
+  ZONES.slice(1).forEach(([n,a_])=>{s+=`<line x1="${x1+cw}" y1="${Y(a_)}" x2="${x2}" y2="${Y(a_+dh)}" stroke="var(--ink-3)" stroke-dasharray="2 3"/>`;});
+  if(N.loc&&window.__locElev!=null){const yy=Y(window.__locElev);s+=`<line x1="${L}" x2="${Wd-6}" y1="${yy}" y2="${yy}" stroke="var(--target)" stroke-width="1.5"/><text class="tgt" x="${L+2}" y="${yy-4}">${N.loc} ${window.__locElev} m</text>`;}
+  s+='</svg>';
+  el.innerHTML=`<h3>Höhenstufen rücken nach oben</h3><p>Schematische Vegetationshöhenstufen (nördliche Randalpen) und ihre Verschiebung um ${Math.round(dh)} m bei gleicher Temperatur. Lokale Grenzen variieren je nach Region, Exposition und Boden.</p>`+s;
+}
+function drawSpei(el,sp){
+  const ys=sp.ys.filter(y=>sp.z[y]&&sp.z[y].some(v=>v!=null));if(ys.length<8){el.remove();return;}
+  el.innerHTML=`<h3>Trockenstress im Jahreslauf</h3><p>Standardisierte klimatische Wasserbilanz über 3 Monate (wie SPEI-3), je Kalendermonat verglichen mit der Referenz. ${PALNAME[st.pal][0]}: trockener, ${PALNAME[st.pal][1]}: feuchter. Unter −1 gilt als trocken, unter −1.5 als sehr trocken.</p><div class="vizbox"><canvas style="display:block;width:100%"></canvas><div class="tip" hidden></div></div><div class="legend"><span>Standardabweichungen</span><div class="lgscale"><canvas width="360" height="12"></canvas><div class="lgticks"><span>−2</span><span>−1</span><span>0</span><span>+1</span><span>+2</span></div></div></div>`;
+  const cv=el.querySelector('.vizbox canvas'),box=el.clientWidth,dpr=window.devicePixelRatio||1,HL=40,HT=4,HB=20,rh=Math.max(2.5,Math.min(9,300/ys.length)),H=HT+HB+rh*ys.length,cw=(box-HL-6)/12;
+  cv.style.height=H+'px';cv.width=Math.round(box*dpr);cv.height=Math.round(H*dpr);const g=cv.getContext('2d');g.setTransform(dpr,0,0,dpr,0,0);
+  ys.forEach((y,i)=>sp.z[y].forEach((v,m)=>{g.fillStyle=v==null?css('--grid'):`rgb(${ramp(BB,(Math.max(-2,Math.min(2,v))+2)/4)})`;g.fillRect(HL+m*cw,HT+i*rh,Math.ceil(cw)+0.5,Math.ceil(rh)+0.5);}));
+  g.fillStyle=css('--ink-3');g.font='10px '+css('--f-data');g.textAlign='right';g.textBaseline='middle';ys.forEach((y,i)=>{if(y%(ys.length>60?20:10)===0)g.fillText(y,HL-6,HT+(i+0.5)*rh);});
+  g.textAlign='center';g.textBaseline='top';MON.forEach((m,i)=>g.fillText(m,HL+(i+0.5)*cw,HT+rh*ys.length+5));
+  const lc=el.querySelector('.legend canvas').getContext('2d');for(let x=0;x<360;x++){lc.fillStyle=`rgb(${ramp(BB,x/359)})`;lc.fillRect(x,0,1,12);}
+  const tp=el.querySelector('.tip');cv.onpointermove=e=>{const r=cv.getBoundingClientRect(),x=e.clientX-r.left,yy=e.clientY-r.top;const m=Math.floor((x-HL)/cw),i=Math.floor((yy-HT)/rh);if(m<0||m>11||i<0||i>=ys.length){tp.hidden=true;return;}
+    const v=sp.z[ys[i]][m];tp.innerHTML=`<b>${MON[m]} ${ys[i]}</b><br><span class="k">3 Monate bis Ende ${MON[m]}</span> <b>${v==null?'–':fmtSign(v,2)}</b>`;tp.hidden=false;tp.style.left=Math.min(box-tp.offsetWidth-4,x+12)+'px';tp.style.top=Math.max(0,yy-44)+'px';};
+  cv.onpointerleave=()=>tp.hidden=true;
+}
+function drawLand(){
+  const g=$('landCharts'),tl=$('landTiles');if(!g)return;g.innerHTML='';
+  const D=landData();window.__locElev=ELEV.loc??null;
+  tl.innerHTML=tiles(D).map(([k,v,s])=>`<div class="tile"><div class="eyebrow">${k}</div><div class="big">${v}</div><div class="note">${s}</div></div>`).join('');
+  const add=(cfg,wide)=>{if(!cfg.years||cfg.years.filter((_,i)=>cfg.series.some(s=>s.v[i]!=null)).length<8)return null;const d=document.createElement('div');d.className='chart'+(wide?' wide':'');g.appendChild(d);lineChart(d,cfg);return d;};
+  const box=()=>{const d=document.createElement('div');d.className='chart';g.appendChild(d);return d;};
+  const c1=css('--s1'),c2=css('--s2'),c3=css('--s3'),c4=css('--s4'),c5=css('--s5');const [a,b]=refFor(has('T')?'T':'P');
+  if(D.ty){const [A]=cmp(D.ty,D.ta,a,b,RECENT);if(A!=null){
+    add({years:D.ty,title:'Höhenverschiebung des Klimas',sub:`Temperaturabweichung gegenüber ${a}–${b} in Höhenmetern ausgedrückt (${LAPSE} °C pro 100 m). +300 m heisst: Es ist so warm wie früher 300 m tiefer.`,series:[{name:'Höhenverschiebung',v:D.ta.map(x=>x==null?null:(x-A)/LAPSE*100),c:c2}],zero:0,tf:x=>(x>0?'+':'')+x+' m',vf:x=>fmtSign(x,0)+' m',w:1080,h:220},true);
+    const [B]=cmp(D.ty,D.ta,RECENT[0],RECENT[1],RECENT);drawProfile(box(),B!=null?(B-A)/LAPSE*100:0);}
+    add({years:D.ty,title:'Nullgradgrenze im Winter',sub:`Höhe, auf der das Dez–Feb-Mittel 0 °C beträgt, geschätzt aus ${N.T} (${ELEV.T??'?'} m) mit ${LAPSE} °C/100 m. Darunter fällt Niederschlag zunehmend als Regen.`,series:[{name:'Nullgradgrenze',v:D.h0,c:c1}],vf:x=>Math.round(x)+' m',tf:x=>x+' m'});}
+  const A=V.T&&V.T.ann;
+  if(A&&A.year.length){
+    add({years:A.year,title:'Vegetationsperiode: Beginn und Ende',sub:'Beginn: erste 6 Tage in Folge über 5 °C; Ende: erste 6 Tage in Folge unter 5 °C ab Juli',series:[{name:'Ende',v:A.ve,c:c2},{name:'Beginn',v:A.vs,c:c3}],tf:doyD,vf:doyD,ticks:[31,90,151,212,273,334],rightPad:40,legend:true});
+    add({years:A.year,title:'Länge der Vegetationsperiode',sub:'Tage pro Jahr',series:[{name:'Länge',v:A.vl,c:c3}],vf:x=>Math.round(x)+' Tage'});
+    add({years:A.year,title:'Spätfrost nach Vegetationsbeginn',sub:'Frosttage (Minimum unter 0 °C) zwischen Vegetationsbeginn und Ende Juni; je mehr, desto grösser das Risiko für Blüten und Austrieb',series:[{name:'Frosttage',v:A.frostAfter,c:c1}],vf:x=>x.toFixed(1)+' Tage'});
+    add({years:A.year,title:'Letzter Frost im Frühling',sub:'Datum des letzten Tages mit Minimum unter 0 °C vor Juli',series:[{name:'Letzter Frost',v:A.lastFrost,c:c1}],tf:doyD,vf:doyD});
+    add({years:A.year,title:'Hitze',sub:'Sommertage (Maximum ≥ 25 °C), Hitzetage (≥ 30 °C) und Tropennächte (Minimum ≥ 20 °C) pro Jahr',series:[{name:'Sommertage',v:A.summer,c:c4},{name:'Hitzetage',v:A.hot,c:c2},{name:'Tropennächte',v:A.trop,c:c5}],vf:x=>x.toFixed(1)+' Tage',rightPad:70,legend:true});}
+  if(D.mon){drawSpei(box(),speiGrid(D.mon,a,b));
+    add({years:D.by,title:'Sommer-Wasserbilanz',sub:`Niederschlag ${N.P} minus geschätzte Verdunstung, Juni–August, mm. Unter null verliert der Boden über den Sommer Wasser.`,series:[{name:'Wasserbilanz',v:D.bal,c:c1}],zero:0,vf:x=>Math.round(x)+' mm'});}
+  const AP=V.P&&V.P.ann;
+  if(AP&&AP.year.length)add({years:AP.year,title:'Längste Trockenperiode Apr–Sep',sub:`Tage in Folge mit weniger als 1 mm, ${N.P}`,series:[{name:'Trockenperiode',v:AP.dry,c:c2}],vf:x=>Math.round(x)+' Tage'});
+  if(D.qy){
+    add({years:D.qy,title:'Niedrigwasser',sub:`Tiefstes Wochenmittel und Abfluss, der an 95 % der Wochen erreicht wird (ähnlich Q347), ${N.Q}`,series:[{name:'Q95 Woche',v:D.q347,c:c3},{name:'Minimum',v:D.qmin,c:c1}],vf:x=>x.toFixed(1)+' m³/s',sm:Math.min(st.sm,7),rightPad:70,legend:true});
+    add({years:D.qy,title:'Wann ist das Wasser am tiefsten?',sub:'Datum des tiefsten Wochenmittels. Alpine Flüsse haben ihr Minimum im Winter; rückt es in den Spätsommer, prägen Regen und Verdunstung den Fluss stärker als Schnee.',series:[{name:'Minimum',v:D.qtw,c:c1}],tf:doyD,vf:doyD,ticks:[31,120,212,304],sm:Math.min(st.sm,7)});}
+}
+
+function all(){if(!has('T')&&!has('P'))return;setWhere();updateVarButtons();draw();drawLand();drawJG();drawScatter();drawCum();drawSeg();drawCharts();}
 function updateVarButtons(){document.querySelectorAll('#varSeg button').forEach(b=>{b.hidden=!has(b.dataset.v);});document.querySelectorAll('#segVar button').forEach(b=>{b.hidden=!has(b.dataset.s);});document.querySelectorAll('#heatMode button').forEach(b=>{b.hidden=b.dataset.h!=='P'&&!has('Q');});}
 syncControls();
 let rt;window.addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(()=>{if(has('T')||has('P')){draw();drawSeg();}},120);});
@@ -378,8 +479,8 @@ new MutationObserver(all).observe(document.documentElement,{attributes:true,attr
 
 
 window.KK={redraw(){if(has('T')||has('P'))all();},place(){const st_=['T','P','S','Q'].filter(k=>N[k]).map(k=>META[k].name+' '+N[k]).join(', ');return (N.loc?N.loc+' · ':'')+st_;},setData(out,names,elev,loc){
-  V=out;N={T:names.T||'',P:names.P||'',S:names.S||'',Q:names.Q||'',loc:loc&&loc.name?loc.name:''};ELEV=elev||{};
-  buildDerived(loc&&loc.lat);finishV();
+  V=out;ELEV.loc=null;N={T:names.T||'',P:names.P||'',S:names.S||'',Q:names.Q||'',loc:loc&&loc.name?loc.name:''};ELEV=elev||{};
+  ELEV.loc=loc&&loc.elev!=null?loc.elev:null;buildDerived(loc&&loc.lat);finishV();
   const ysMin=Math.min(...Object.values(V).map(v=>v.y0));$('ys').min=ysMin;$('r0').min=ysMin;
   all();
 }};

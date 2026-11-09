@@ -51,11 +51,42 @@ function weekGrid(daily,how){ // daily: [[y,doy,value]] -> {y0,g}
 async function metSeries(id,k){
   const s=ST.met.find(x=>x.id===id);if(!s||!s.v[k])return null;const [,, ,coll,col]=s.v[k];const ab=id.toLowerCase();
   const parts=await Promise.all(['historical','recent'].map(p=>tget(`${MS}${coll}/${ab}/${coll}_${ab}_d_${p}.csv`)));
-  const daily=[];
+  const daily=[],ext={};  // ext[year] = {mean:[],min:[],max:[]} per day of year (T) or {p:[]} (P)
+  const cMin=col.replace(/d0$/,'dn'),cMax=col.replace(/d0$/,'dx');
   for(const t of parts){if(!t)continue;const L=t.split(/\r?\n/);const h=L[0].split(';');const ti=h.indexOf('reference_timestamp'),ci=h.indexOf(col);if(ci<0)continue;
+    const ni=k==='T'?h.indexOf(cMin):-1,xi=k==='T'?h.indexOf(cMax):-1;
     for(let i=1;i<L.length;i++){const a=L[i].split(';');const v=a[ci];if(v===undefined||v===''||v==='-')continue;const ts=a[ti];const d=+ts.slice(0,2),m=+ts.slice(3,5),y=+ts.slice(6,10);
-      const doy=Math.round((Date.UTC(y,m-1,d)-Date.UTC(y,0,1))/864e5);daily.push([y,doy,+v]);}}
-  return weekGrid(daily,k==='P'?'sum7':'mean');
+      const doy=Math.round((Date.UTC(y,m-1,d)-Date.UTC(y,0,1))/864e5);daily.push([y,doy,+v]);
+      if(k==='T'||k==='P'){const e=ext[y]||(ext[y]={mean:new Array(366).fill(null),min:new Array(366).fill(null),max:new Array(366).fill(null)});e.mean[doy]=+v;
+        if(ni>=0&&a[ni]!==''&&a[ni]!==undefined)e.min[doy]=+a[ni];if(xi>=0&&a[xi]!==''&&a[xi]!==undefined)e.max[doy]=+a[xi];}}}
+  const gr=weekGrid(daily,k==='P'?'sum7':'mean');if(!gr)return null;
+  gr.ann=k==='T'?annualT(ext):k==='P'?annualP(ext):null;
+  return gr;
+}
+/* yearly landscape indicators from daily values */
+function annualT(ext){
+  const out={year:[],vs:[],ve:[],vl:[],lastFrost:[],frostAfter:[],frost:[],summer:[],hot:[],trop:[]};
+  const thisYear=new Date().getFullYear();
+  for(const y of Object.keys(ext).map(Number).sort((a,b)=>a-b)){if(y>=thisYear)continue;const e=ext[y];const n=e.mean.filter(v=>v!=null).length;if(n<330)continue;
+    const T=e.mean,run=(i,f)=>{for(let j=0;j<6;j++){const v=T[i+j];if(v==null||!f(v))return false;}return true;};
+    let vs=null,ve=null;for(let i=0;i<300;i++)if(run(i,v=>v>5)){vs=i;break;}
+    for(let i=181;i<360;i++)if(run(i,v=>v<5)){ve=i-1;break;}if(vs!=null&&ve==null)ve=364;
+    const nMin=e.min.filter(v=>v!=null).length,nMax=e.max.filter(v=>v!=null).length;
+    let lf=null,fa=0,fr=0,su=0,ho=0,tr=0;
+    if(nMin>=330){for(let i=0;i<181;i++)if(e.min[i]!=null&&e.min[i]<0)lf=i;
+      for(let i=0;i<366;i++){const m=e.min[i];if(m==null)continue;if(m<0){fr++;if(vs!=null&&i>=vs&&i<181)fa++;}if(m>=20)tr++;}}
+    if(nMax>=330)for(let i=0;i<366;i++){const x=e.max[i];if(x==null)continue;if(x>=25)su++;if(x>=30)ho++;}
+    out.year.push(y);out.vs.push(vs);out.ve.push(ve);out.vl.push(vs!=null&&ve!=null?ve-vs+1:null);
+    out.lastFrost.push(nMin>=330?lf:null);out.frostAfter.push(nMin>=330&&vs!=null?fa:null);out.frost.push(nMin>=330?fr:null);
+    out.summer.push(nMax>=330?su:null);out.hot.push(nMax>=330?ho:null);out.trop.push(nMin>=330?tr:null);}
+  return out;
+}
+function annualP(ext){
+  const out={year:[],dry:[],heavy:[]};const thisYear=new Date().getFullYear();
+  for(const y of Object.keys(ext).map(Number).sort((a,b)=>a-b)){if(y>=thisYear)continue;const P=ext[y].mean;if(P.filter(v=>v!=null).length<330)continue;
+    let run=0,mx=0,hv=0;for(let i=0;i<366;i++){const v=P[i];if(v==null)continue;if(v>=20)hv++;if(i>=90&&i<273){if(v<1){run++;mx=Math.max(mx,run);}else run=0;}}
+    out.year.push(y);out.dry.push(mx);out.heavy.push(hv);}
+  return out;
 }
 
 /* ---------- basin (BAFU Hydrologischer Atlas) & rivers ---------- */
@@ -132,8 +163,14 @@ function fillSelects(preset){
 function initMap(){
   if(typeof L==='undefined'){document.getElementById('map').innerHTML='<p class="note" style="padding:16px">Die Karte konnte nicht geladen werden. Ort über die Suche wählen.</p>';map=null;return;}
   map=L.map('map',{zoomControl:true,attributionControl:true,minZoom:7,maxBounds:[[45.4,5.4],[48.2,11.0]]}).setView([46.8,8.2],8);
-  L.tileLayer('https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.pixelkarte-grau/default/current/3857/{z}/{x}/{y}.jpeg',{maxZoom:17,className:'basemap',attribution:'© swisstopo, BAFU'}).addTo(map);
-  riverTiles=L.tileLayer('https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.vec25-gewaessernetz_referenz/default/current/3857/{z}/{x}/{y}.png',{maxZoom:17,minZoom:11,opacity:0.8});
+  const W='https://wmts.geo.admin.ch/1.0.0/';
+  const bases={relief:L.tileLayer(W+'ch.swisstopo.leichte-basiskarte_reliefschattierung/default/current/3857/{z}/{x}/{y}.png',{maxZoom:17,className:'basemap',attribution:'© swisstopo, BAFU'}),
+    lk:L.tileLayer(W+'ch.swisstopo.pixelkarte-grau/default/current/3857/{z}/{x}/{y}.jpeg',{maxZoom:17,className:'basemap',attribution:'© swisstopo, BAFU'})};
+  let base='relief';try{base=localStorage.getItem('climate-data-base')||'relief';}catch(e){}if(!bases[base])base='relief';bases[base].addTo(map);
+  document.querySelectorAll('#baseSeg button').forEach(b=>{b.setAttribute('aria-pressed',String(b.dataset.b===base));b.onclick=()=>{map.removeLayer(bases[base]);base=b.dataset.b;bases[base].addTo(map).bringToBack();
+    document.querySelectorAll('#baseSeg button').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.b===base)));try{localStorage.setItem('climate-data-base',base);}catch(e){}};});
+  riverTiles=L.layerGroup([L.tileLayer(W+'ch.bafu.vec25-gewaessernetz_2000/default/current/3857/{z}/{x}/{y}.png',{maxZoom:10,opacity:0.85}),
+    L.tileLayer(W+'ch.swisstopo.vec25-gewaessernetz_referenz/default/current/3857/{z}/{x}/{y}.png',{maxZoom:17,minZoom:11,opacity:0.8})]);
   basinLayer=L.layerGroup().addTo(map);bilLayer=L.layerGroup().addTo(map);riverLayer=L.layerGroup().addTo(map);
   layerMet=L.layerGroup().addTo(map);layerQ=L.layerGroup().addTo(map);selLayer=L.layerGroup().addTo(map);
   if(document.getElementById('chkRivers').checked)riverTiles.addTo(map);
@@ -186,7 +223,7 @@ async function loadData(){
   try{
     const out={},names={},elev={};
     const jobs=['T','P','S'].filter(k=>SEL[k]).map(async k=>{const key=k+SEL[k];if(!cache[key])cache[key]=metSeries(SEL[k],k);const gr=await cache[key];
-      const s=ST.met.find(x=>x.id===SEL[k]);if(gr)out[k]=gr;if(k==='T')elev.Th=!!(s&&s.v.T&&s.v.T[2]);names[k]=s?s.name:SEL[k];elev[k]=s?s.elev:null;});
+      const s=ST.met.find(x=>x.id===SEL[k]);if(gr)out[k]={y0:gr.y0,g:gr.g,ann:gr.ann};if(k==='T')elev.Th=!!(s&&s.v.T&&s.v.T[2]);names[k]=s?s.name:SEL[k];elev[k]=s?s.elev:null;});
     if(SEL.Q)jobs.push(loadSeries('q',SEL.Q).then(j=>{out.Q={y0:j.y0,g:j.g};const s=ST.hydro.find(x=>x.id===SEL.Q);names.Q=s?s.name:SEL.Q;}).catch(()=>{}));
     await Promise.all(jobs);
     window.KK.setData(out,names,elev,LOC);

@@ -31,6 +31,7 @@
         <label class="check"><input type="checkbox" id="chkBasin" checked> Flussgebiet</label>
         <label class="check"><input type="checkbox" id="chkBil"> Teilgebiet (Bilanzgebiet)</label>
         <label class="check"><input type="checkbox" id="chkStations" checked> Stationen</label>
+        <div class="seg" role="group" id="baseSeg"><button type="button" data-b="relief" aria-pressed="true">Relief</button><button type="button" data-b="lk" aria-pressed="false">Landeskarte</button></div>
       </div>
       <div class="controls">
         <button class="btn" type="button" id="dlBasin">Flussgebiet GeoJSON</button>
@@ -63,7 +64,7 @@
     <div class="ctl"><span>Ansicht</span>
       <div class="seg" role="group" id="viewSeg"><button data-w="grid">Raster</button><button data-w="ring">Jahresringe</button></div></div>
     <div class="ctl"><span>Farben Wasser</span>
-      <div class="seg" role="group" id="palSeg"><button data-p="gtb">Grün–Türkis–Blau</button><button data-p="vp">Violett–Pink</button><button data-p="gr">Grauwerte</button></div></div>
+      <div class="seg" role="group" id="palSeg"><button data-p="gtb">Grün–Blau</button><button data-p="vp">Pink–Violett</button><button data-p="yp">Gelb–Petrol</button></div></div>
   </div>
   <div class="controls">
     <label class="ctl"><span>Referenz ab</span>
@@ -85,6 +86,15 @@
   <div class="vizbox" id="vizbox"><canvas id="cal" aria-label="Kalender Jahr mal Woche"></canvas><div class="tip" id="tip" hidden></div></div>
   <div class="legend"><span id="lgTitle"></span><div class="lgscale"><canvas id="lg" width="360" height="12"></canvas><div class="lgticks" id="lgt"></div></div></div>
   <p class="note" id="calNote"></p>
+</section>
+
+<section class="sec" id="landSec">
+  <div class="sechead"><h2>Landschaft · aktuelle Tendenzen</h2><span class="note">Letzte 10 Jahre (2016–2025) gegenüber der gewählten Referenzperiode</span></div>
+  <div class="tiles" id="landTiles"></div>
+  <div class="panel">
+    <p class="lede">Kennzahlen, die für Landschafts- und Freiraumplanung zählen: Wie weit ist das Klima bergauf gewandert, wie lang ist die Wachstumszeit, wie oft gibt es Spätfrost, Hitze, Trockenstress und Niedrigwasser?</p>
+    <div class="grid" id="landCharts"></div>
+  </div>
 </section>
 
 <section class="sec">
@@ -152,6 +162,10 @@
       <li><b>Flussgebiete und Gewässer:</b> BAFU Hydrologischer Atlas (Flussgebiete, Bilanzgebiete) und swisstopo Gewässernetz VECTOR25 über die API von geo.admin.ch. Stationen im selben Flussgebiet liegen im gleichen Gewässersystem, also fluss­auf- oder abwärts am selben Hauptfluss oder an dessen Zuflüssen.</li>
       <li><b>Farbskalen:</b> Die Grenzen passen sich den angezeigten Daten an (2. und 98. Perzentil), mit Null in der Mitte; Werte darüber werden in der Endfarbe gezeigt.</li>
       <li><b>Herunterladen:</b> Jede Grafik als SVG oder PNG mit transparentem Hintergrund; die Schriftfarbe lässt sich oben umstellen.</li>
+      <li><b>Höhenverschiebung:</b> Temperaturänderung geteilt durch eine mittlere Temperaturabnahme von 0.55 °C pro 100 m. Die Höhenstufen sind schematisch (nördliche Randalpen: kollin bis 600 m, montan bis 1300 m, subalpin bis 1900 m, alpin bis 2600 m) und dienen der Veranschaulichung.</li>
+      <li><b>Vegetationsperiode:</b> Beginn mit den ersten 6 Tagen in Folge über 5 °C Tagesmittel, Ende mit den ersten 6 Tagen in Folge unter 5 °C ab Juli. Spätfrost: Tage mit Minimum unter 0 °C zwischen Vegetationsbeginn und Ende Juni. Hitze: Sommertage (Maximum ≥ 25 °C), Hitzetage (≥ 30 °C), Tropennächte (Minimum ≥ 20 °C). Berechnet aus Tageswerten der Temperaturstation; Minimum und Maximum sind teils erst ab dem 20. Jahrhundert verfügbar.</li>
+      <li><b>Trockenstress:</b> Klimatische Wasserbilanz (Niederschlag minus Verdunstung nach Hamon) über 3 Monate, je Kalendermonat standardisiert an der Referenz (vereinfachter SPEI-3, Normalverteilung statt Log-Logistik).</li>
+      <li><b>Niedrigwasser:</b> aus Wochenmitteln: tiefstes Wochenmittel pro Jahr und der Wert, der in 95 % der Wochen erreicht wird (Näherung an Q347 aus Tageswerten).</li>
       <li><b>Paris-Ziele:</b> +1.5 °C und +2 °C beziehen sich auf das globale Mittel gegenüber vorindustriell. Sie werden eingezeichnet, wenn die Referenz vor 1901 endet. Der Alpenraum erwärmt sich etwa doppelt so stark.</li>
     </ul>
   </details>
