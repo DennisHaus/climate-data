@@ -6,30 +6,52 @@
 <title>Klimakalender Schweiz</title>
 <meta name="description" content="Temperatur, Niederschlag, Schnee und Abfluss für jeden Ort der Schweiz: Karte, Stationswahl und Klimakalender aus offenen Daten von MeteoSchweiz und BAFU.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600;700;800;900&display=swap">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 <div class="wrap">
-<header>
-  <div class="eyebrow">climate-data · offene Daten MeteoSchweiz und BAFU</div>
-  <h1>Klimakalender Schweiz</h1>
-  <p class="lede">Ort auf der Karte wählen oder suchen. Das Tool sucht passende Stationen für Temperatur, Niederschlag, Schnee und Abfluss und zeigt, wie sich Wärme und Wasser über das Jahr und über die Jahrzehnte verschieben.</p>
+<header class="brand">
+  <div class="eyebrow">© ETH Zurich · climate-data</div>
+  <h1 class="brand-title">Klima<br>Kalender<br>Schweiz</h1>
+  <p class="brand-subtitle">temperature, precipitation, snow &amp; runoff interface | Ort wählen, passende Stationen von MeteoSchweiz und BAFU finden und sehen, wie sich Wärme und Wasser über das Jahr und die Jahrzehnte verschieben | beta version
+  <br><br>See all Tools <a href="https://dennishaus.github.io/overview/" target="_blank" rel="noopener">here</a> | Daten <a href="https://www.meteoschweiz.admin.ch/service-und-publikationen/service/open-data.html" target="_blank" rel="noopener">MeteoSchweiz Open Data</a>, <a href="https://www.hydrodaten.admin.ch" target="_blank" rel="noopener">BAFU Hydrodaten</a></p>
+  <div class="toolbar">
+    <button class="btn accent" id="btnReadme" type="button">Read me</button>
+    <div class="seg" role="group" id="expSeg" title="Schriftfarbe beim Herunterladen der Grafiken (Hintergrund immer transparent)"><button data-e="light" type="button">Export: helle Schrift</button><button data-e="dark" type="button">Export: dunkle Schrift</button></div>
+  </div>
 </header>
 
 <section class="panel" aria-label="Ort und Stationen">
   <div class="mapgrid">
-    <div id="map" role="application" aria-label="Karte der Schweiz, klicken um einen Ort zu wählen"></div>
+    <div id="mapWrap" style="display:flex;flex-direction:column;gap:8px;min-width:0"><div id="map" role="application" aria-label="Karte der Schweiz, klicken um einen Ort zu wählen"></div>
+      <div class="controls">
+        <label class="check"><input type="checkbox" id="chkRivers" checked> Gewässernetz</label>
+        <label class="check"><input type="checkbox" id="chkBasin" checked> Flussgebiet</label>
+        <label class="check"><input type="checkbox" id="chkBil"> Teilgebiet (Bilanzgebiet)</label>
+        <label class="check"><input type="checkbox" id="chkStations" checked> Stationen</label>
+      </div>
+      <div class="controls">
+        <button class="btn" type="button" id="dlBasin">Flussgebiet GeoJSON</button>
+        <button class="btn" type="button" id="dlRivers">Gewässer GeoJSON</button>
+        <button class="btn" type="button" id="dlStations">Stationen GeoJSON</button>
+        <button class="btn" type="button" id="dlMapSvg">Karte SVG</button>
+      </div>
+    </div>
     <div class="stations">
       <div class="searchbox"><input id="search" type="search" placeholder="Ort suchen, z. B. Glarus, Sion, 8001" autocomplete="off" aria-label="Ort suchen"><ul id="searchList"></ul></div>
-      <div><div class="eyebrow">Gewählter Ort</div><h2 id="locTitle">–</h2><div class="note" id="locInfo"></div></div>
-      <label class="ctl"><span><i class="dot" style="background:#eb6834"></i>Temperatur</span><select id="selT"></select></label>
-      <label class="ctl"><span><i class="dot" style="background:#2a78d6"></i>Niederschlag</span><select id="selP"></select></label>
-      <label class="ctl"><span><i class="dot" style="background:#6250d6"></i>Schneehöhe</span><select id="selS"></select></label>
-      <label class="ctl"><span><i class="dot" style="background:#1baf7a"></i>Abfluss</span><select id="selQ"></select></label>
+      <div><div class="eyebrow">Gewählter Ort</div><h2 class="loc" id="locTitle">–</h2><div class="note" id="locInfo"></div><div class="basin" id="basinInfo"></div></div>
+      <div class="controls">
+        <label class="ctl"><span>Suchradius</span><div class="range"><input id="radius" type="range" min="5" max="100" step="5" value="40"><output id="radiuso"></output></div></label>
+        <label class="check"><input type="checkbox" id="chkSameBasin" checked> gleiches Flussgebiet bevorzugen</label>
+      </div>
+      <label class="ctl"><span><i class="dot" style="background:#e8775f"></i>Temperatur</span><select id="selT"></select></label>
+      <label class="ctl"><span><i class="dot" style="background:#5a9ccc"></i>Niederschlag</span><select id="selP"></select></label>
+      <label class="ctl"><span><i class="dot" style="background:#b9a6ff"></i>Schneehöhe</span><select id="selS"></select></label>
+      <label class="ctl"><span><i class="dot" style="background:#3fbf8f"></i>Abfluss</span><select id="selQ"></select></label>
       <p class="note" id="selNote"></p>
-      <p class="note">Vorgeschlagen werden nahe Stationen mit ähnlicher Höhe und langer Messreihe; homogenisierte Temperaturreihen werden bevorzugt. Jede Station lässt sich austauschen. Graue Punkte: Wetterstationen, blaue Punkte: Abflussstationen.</p>
+      <p class="note">Vorschläge: Stationen im Suchradius, mit ähnlicher Höhe und langer Messreihe; homogenisierte Temperatur und, wenn eingeschaltet, Stationen im selben Flussgebiet (gleiches Gewässersystem, fluss­auf- oder ‑abwärts) werden bevorzugt. ◆ = im selben Flussgebiet.</p>
     </div>
   </div>
 </section>
@@ -41,7 +63,7 @@
     <div class="ctl"><span>Ansicht</span>
       <div class="seg" role="group" id="viewSeg"><button data-w="grid">Raster</button><button data-w="ring">Jahresringe</button></div></div>
     <div class="ctl"><span>Farben Wasser</span>
-      <div class="seg" role="group" id="palSeg"><button data-p="sb">Sand–Blau</button><button data-p="gb">Grau–Blau</button><button data-p="ov">Orange–Violett</button></div></div>
+      <div class="seg" role="group" id="palSeg"><button data-p="gtb">Grün–Türkis–Blau</button><button data-p="vp">Violett–Pink</button><button data-p="gr">Grauwerte</button></div></div>
   </div>
   <div class="controls">
     <label class="ctl"><span>Referenz ab</span>
@@ -116,8 +138,8 @@
   <div class="grid" id="charts"></div>
   <p class="note">Dünne Linie: Einzeljahre. Kräftige Linie: gleitendes Mittel. Werte aus Wochenmitteln bzw. Wochensummen berechnet.</p>
 </section>
-<section class="panel">
-  <details>
+<section class="panel" id="readme">
+  <details id="readmeDetails">
     <summary>Daten und Methode</summary>
     <ul>
       <li><b>Wetterdaten:</b> werden bei jeder Abfrage live von MeteoSchweiz Open Data (data.geo.admin.ch) geladen und im Browser zu Wochenwerten verrechnet: SwissMetNet, Niederschlags- und Schneemessnetz sowie Swiss NBCN. Temperatur wird, wo vorhanden, aus den homogenisierten NBCN-Reihen genommen. Niederschlag und Schnee wie gemessen.</li>
@@ -127,6 +149,9 @@
       <li><b>Kalender:</b> Temperatur als Abweichung in °C (Farbskala nach Ed Hawkins), Niederschlag und Abfluss als Verhältnis zur Referenz, Schnee als Differenz in cm, Schneeanteil und Bodenfeuchte in Prozentpunkten. Glättung als zentriertes gleitendes Mittel über Jahre und (zyklisch) über Wochen.</li>
       <li><b>Schneeanteil (geschätzt):</b> Anteil des Niederschlags, der bei der Temperatur der Temperaturstation als Schnee fällt (weiche Schwelle um 1 °C). Eine Schätzung, keine Messung.</li>
       <li><b>Bodenfeuchte (modelliert):</b> Bodenwasser-Modell in Wochenschritten am Ort der Niederschlagsstation: Temperatur auf deren Höhe umgerechnet (0.65 °C pro 100 m), Schneespeicher mit Gradtag-Schmelze, potenzielle Verdunstung nach Hamon, Bodenspeicher 150 mm. Ein Index für die Richtung, kein Messwert.</li>
+      <li><b>Flussgebiete und Gewässer:</b> BAFU Hydrologischer Atlas (Flussgebiete, Bilanzgebiete) und swisstopo Gewässernetz VECTOR25 über die API von geo.admin.ch. Stationen im selben Flussgebiet liegen im gleichen Gewässersystem, also fluss­auf- oder abwärts am selben Hauptfluss oder an dessen Zuflüssen.</li>
+      <li><b>Farbskalen:</b> Die Grenzen passen sich den angezeigten Daten an (2. und 98. Perzentil), mit Null in der Mitte; Werte darüber werden in der Endfarbe gezeigt.</li>
+      <li><b>Herunterladen:</b> Jede Grafik als SVG oder PNG mit transparentem Hintergrund; die Schriftfarbe lässt sich oben umstellen.</li>
       <li><b>Paris-Ziele:</b> +1.5 °C und +2 °C beziehen sich auf das globale Mittel gegenüber vorindustriell. Sie werden eingezeichnet, wenn die Referenz vor 1901 endet. Der Alpenraum erwärmt sich etwa doppelt so stark.</li>
     </ul>
   </details>
@@ -135,6 +160,7 @@
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="js/kalender.js"></script>
+<script src="js/export.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

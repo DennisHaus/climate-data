@@ -31,18 +31,19 @@ const $=id=>document.getElementById(id);
 const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 
 const HAWK=['#08306b','#08519c','#2171b5','#4292c6','#6baed6','#9ecae1','#c6dbef','#deebf7','#fee0d2','#fcbba1','#fc9272','#fb6a4a','#ef3b2c','#cb181d','#a50f15','#67000d'];
-const PALS={sb:['#6e5410','#9c7a25','#c8a24c','#e3c98a','#f4e8cb','#f1f2f0','#d3e5f0','#9cc6e0','#5a9ccc','#2a6aab','#0e3d78'],
-  gb:['#3a3a3a','#666666','#949494','#bdbdbd','#dedede','#f1f1ef','#d3e5f0','#9cc6e0','#5a9ccc','#2a6aab','#0e3d78'],
-  ov:['#8a3b05','#bd5a0b','#e0852b','#f4b675','#fbe1c3','#f2f1ef','#dedcec','#bab3d6','#8d7fbb','#5f4695','#341a66']};
+const PALS={gtb:['#0b3d2a','#17663f','#2a9358','#58bd84','#9adfc0','#c6f0ec','#86d3e0','#46a6d6','#2a74c6','#1b4c9b','#0f285e'],
+  vp:['#2a0f4f','#46207e','#6a35a8','#9258c6','#c191dc','#f0d9f0','#f4a8cf','#e872aa','#cf4588','#a3216a','#6b0f45'],
+  gr:[...Array(11).keys()].map(i=>{const t=i/10,g=Math.round(18+232*Math.pow(t,0.72));const h=g.toString(16).padStart(2,'0');return '#'+h+h+h;})};
+const PALNAME={gtb:['Grün','Blau'],vp:['Violett','Pink'],gr:['Dunkel','Hell']};
 const hex=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16));
-const HK=HAWK.map(hex);let BB=PALS.sb.map(hex);
+const HK=HAWK.map(hex);let BB=PALS.gtb.map(hex);
 function ramp(C,t){t=Math.max(0,Math.min(1,t));const x=t*(C.length-1),i=Math.min(C.length-2,Math.floor(x)),f=x-i;return C[i].map((c,k)=>Math.round(c+(C[i+1][k]-c)*f));}
 
-const DEF={v:'P',view:'ring',r0:1961,rl:30,ys:1975,gam:3,sy:25,sw:5,sm:11,sm2:3,n:12,s0:0,sv:'P',pal:'sb',hm:'d'};
+const DEF={v:'P',view:'ring',r0:1961,rl:30,ys:1975,gam:3,sy:25,sw:5,sm:11,sm2:3,n:12,s0:0,sv:'P',pal:'gtb',hm:'d'};
 const st=Object.assign({},DEF);
 try{Object.assign(st,JSON.parse(localStorage.getItem('climate-data-ui')||'{}'));}catch(e){}
 function save(){try{localStorage.setItem('climate-data-ui',JSON.stringify(st));}catch(e){}}
-BB=(PALS[st.pal]||PALS.sb).map(hex);
+if(!PALS[st.pal])st.pal='gtb';BB=PALS[st.pal].map(hex);
 
 /* reference window per variable (falls back to earliest available window of same length) */
 function refFor(k){const v=V[k];let a=st.r0,b=st.r0+st.rl-1;const lastFull=Math.min(v.y1,2025);
@@ -62,9 +63,14 @@ function fieldFor(k){
   if(m.kind==='diff'||m.kind==='pp')return S.map(r=>r.map((x,w)=>x==null?null:x-cl[w]));
   return S.map(r=>r.map((x,w)=>x==null?null:Math.log2(Math.max(x,0.05)/Math.max(cl[w],0.05))));
 }
-function scaleLim(F){const vals=[];F.forEach(r=>r.forEach(v=>{if(v!=null)vals.push(v);}));const m=vals.reduce((a,b)=>a+b,0)/vals.length;const sd=Math.sqrt(vals.reduce((a,b)=>a+(b-m)**2,0)/vals.length);
-  const lim=2.4*sd;const k=META[st.v].kind;return k==='anom'?Math.max(0.3,Math.round(lim*10)/10):(k==='diff'||k==='pp')?Math.max(2,Math.round(lim)):Math.max(0.1,Math.round(lim*20)/20);}
-const colFor=(v,lim)=>META[st.v].kind==='anom'?ramp(HK,(v+lim)/(2*lim)):ramp(BB,(v+lim)/(2*lim));
+function pctl(a,q){if(!a.length)return 0;const i=(a.length-1)*q,l=Math.floor(i),h=Math.ceil(i);return a[l]+(a[h]-a[l])*(i-l);}
+function niceNum(x){if(x===0)return 0;const m=Math.pow(10,Math.floor(Math.log10(Math.abs(x)))-1);return Math.round(x/m)*m;}
+/* data-adaptive diverging range [lo,hi] with 0 in the middle (2nd/98th percentile) */
+function autoRange(vals,minSpan){const a=vals.filter(v=>v!=null&&isFinite(v)).sort((x,y)=>x-y);let lo=pctl(a,0.02),hi=pctl(a,0.98);
+  const span=Math.max(Math.abs(lo),Math.abs(hi),minSpan||0.1);lo=Math.min(lo,-0.12*span);hi=Math.max(hi,0.12*span);return [niceNum(lo),niceNum(hi)];}
+const tNorm=(v,[lo,hi])=>v<0?0.5*(1-v/lo):0.5+0.5*v/hi;
+function scaleLim(F){const vals=[];F.forEach(r=>r.forEach(v=>{if(v!=null)vals.push(v);}));const k=META[st.v].kind;return autoRange(vals,k==='anom'?0.3:(k==='diff'||k==='pp')?2:0.1);}
+const colFor=(v,R)=>META[st.v].kind==='anom'?ramp(HK,tNorm(v,R)):ramp(BB,tNorm(v,R));
 const fmtV=v=>{const k=META[st.v].kind;return k==='anom'?(v>0?'+':'')+v.toFixed(1)+' °C':k==='diff'?(v>0?'+':'')+v.toFixed(0)+' cm':k==='pp'?(v>0?'+':'')+v.toFixed(0)+' Pp':(v>=0?'+':'')+Math.round((Math.pow(2,v)-1)*100)+' %';};
 
 const MON=['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
@@ -74,7 +80,7 @@ const weekLabel=w=>fD(wDate(w))+' – '+fD(new Date(Date.UTC(2001,0,1+7*w+(w===5
 const monthStartWeek=MON.map((_,m)=>Math.floor((Date.UTC(2001,m,1)-Date.UTC(2001,0,1))/864e5)/7);
 
 const cv=$('cal'),ctx=cv.getContext('2d'),tip=$('tip');
-let F=null,LIM=1,geo=null;
+let F=null,LIM=[-1,1],geo=null;
 function draw(){
   if(!has(st.v))st.v=has('P')?'P':'T';
   const k=st.v,v=V[k];F=fieldFor(k);
@@ -109,10 +115,10 @@ function draw(){
   drawLegend();
   const [a,b,fb]=refFor(k),m=META[k];
   const what=m.kind==='anom'?`Abweichung vom Wochenmittel ${a}–${b}`:m.kind==='diff'?`Differenz zur mittleren Schneehöhe ${a}–${b}`:m.kind==='pp'?`Differenz zum Wochenmittel ${a}–${b} in Prozentpunkten`:`Verhältnis zum Wochenmittel ${a}–${b}`;
-  $('calNote').textContent=`${m.name} ${m.where}, ${ys}–${v.y1}. ${what}${fb?` (gewählte Referenz ${st.r0}–${st.r0+st.rl-1} liegt ausserhalb der Messreihe)`:''}, geglättet über ${st.sy} Jahr${st.sy>1?'e':''} und ${st.sw} Woche${st.sw>1?'n':''}.`+(ring?' Innen das Startjahr, aussen heute, Januar oben, im Uhrzeigersinn.':'')+(m.kind==='anom'?' Farbskala nach Ed Hawkins.':(st.pal==='ov'?' Orange: weniger, Violett: mehr.':st.pal==='gb'?' Grau: weniger, Blau: mehr.':' Sand: weniger, Blau: mehr.'));
+  $('calNote').textContent=`${m.name} ${m.where}, ${ys}–${v.y1}. ${what}${fb?` (gewählte Referenz ${st.r0}–${st.r0+st.rl-1} liegt ausserhalb der Messreihe)`:''}, geglättet über ${st.sy} Jahr${st.sy>1?'e':''} und ${st.sw} Woche${st.sw>1?'n':''}.`+(ring?' Innen das Startjahr, aussen heute, Januar oben, im Uhrzeigersinn.':'')+(m.kind==='anom'?' Farbskala nach Ed Hawkins.':` ${PALNAME[st.pal][0]}: weniger, ${PALNAME[st.pal][1]}: mehr.`);
 }
 function drawLegend(){const c=$('lg'),g=c.getContext('2d'),anom=META[st.v].kind==='anom';for(let x=0;x<360;x++){g.fillStyle=`rgb(${anom?ramp(HK,x/359):ramp(BB,x/359)})`;g.fillRect(x,0,1,12);}
-  $('lgTitle').textContent=META[st.v].name+' gegenüber Referenz';const t=[-LIM,-LIM/2,0,LIM/2,LIM];
+  $('lgTitle').textContent=META[st.v].name+' gegenüber Referenz';const t=[LIM[0],LIM[0]/2,0,LIM[1]/2,LIM[1]];
   $('lgt').innerHTML=t.map(v=>`<span>${fmtV(v).replace(' °C','°')}</span>`).join('');}
 function hit(e){if(!geo)return null;const r=cv.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;let j,w;
   if(!geo.ring){j=Math.floor((x-geo.L)/geo.cw);w=Math.floor((y-geo.T)/geo.rh);}
@@ -141,7 +147,7 @@ on('#viewSeg button',b=>{st.view=b.dataset.w;draw();});
 on('#nSeg button',b=>{st.n=+b.dataset.n;drawSeg();});
 on('#heatMode button',b=>{st.hm=b.dataset.h;drawSeg();});
 on('#segVar button',b=>{st.sv=b.dataset.s;drawCum();});
-$('reset').onclick=()=>{Object.assign(st,DEF);BB=PALS.sb.map(hex);syncControls();save();all();};
+$('reset').onclick=()=>{Object.assign(st,DEF);BB=PALS.gtb.map(hex);syncControls();save();all();};
 const slide=(id,fn)=>$(id).oninput=e=>{st[id]=+e.target.value;if(id==='r0'&&st.r0+st.rl-1>2025)st.rl=2026-st.r0;if(id==='rl'&&st.r0+st.rl-1>2025)st.r0=2026-st.rl;syncControls();save();fn();};
 slide('r0',()=>{draw();drawJG();drawCharts();drawSeg();});slide('rl',()=>{draw();drawJG();drawCharts();drawSeg();});
 slide('ys',draw);slide('gam',draw);slide('sy',draw);slide('sw',draw);slide('sm',drawCharts);slide('sm2',drawSeg);
@@ -188,7 +194,7 @@ function lineChart(el,cfg){
 /* ---------- Jahresgang früher vs heute ---------- */
 function weeklyMean(k,a,b){const v=V[k];const out=[];for(let w=0;w<NW;w++){let s=0,c=0;for(let y=Math.max(a,v.y0);y<=Math.min(b,v.y1);y++){const x=v.g[y-v.y0][w];if(x!=null){s+=x;c++;}}out.push(c?s/c:null);}return out;}
 function drawJG(){
-  const g=$('jg');g.innerHTML='';const c1=css('--q2'),c2=css('--s2');
+  const g=$('jg');g.innerHTML='';const c1=css('--q3'),c2=css('--s2');
   const recent=[2011,2025];
   const sm3=a=>a.map((_,w)=>{let s=0,c=0;for(let k=-1;k<=1;k++){const x=a[(w+k+NW)%NW];if(x!=null){s+=x;c++;}}return c?s/c:null;});
   const notes=[];
@@ -320,19 +326,19 @@ function drawSeg(){
   if(mode!=='d'){const [a,b2]=refFor(mode);const m=new Array(n).fill(0);let c=0;rows.forEach((r,i)=>{if(r&&years[i]>=a&&years[i]<=b2){r.forEach((x,j)=>m[j]+=x);c++;}});rows=rows.map(r=>r?r.map((x,j)=>x-m[j]/c):null);}
   const h=(st.sm2-1)/2;const sm=rows.map((_,i)=>{const acc=new Array(n).fill(0);let c=0;for(let k=-h;k<=h;k++){const r=rows[i+k];if(r){r.forEach((x,j)=>acc[j]+=x);c++;}}return c&&rows[i]?acc.map(x=>x/c):null;});
   const vals=sm.flat().filter(x=>x!=null);const mean=vals.reduce((a,b)=>a+b,0)/vals.length;const sd=Math.sqrt(vals.reduce((a,b)=>a+(b-mean)**2,0)/vals.length);
-  const lim=Math.max(0.5,Math.round(2.2*(mode==='d'?Math.sqrt(vals.reduce((a,b)=>a+b*b,0)/vals.length):sd)*10)/10);
+  const lim=autoRange(vals,0.5);
   const cvs=$('heat'),box=cvs.parentElement.clientWidth,dpr=window.devicePixelRatio||1,HL=46,HT=4,HB=22,rh=Math.max(3,Math.min(12,360/years.length)),H=HT+HB+rh*years.length;
   cvs.style.height=H+'px';cvs.width=Math.round(box*dpr);cvs.height=Math.round(H*dpr);const g=cvs.getContext('2d');g.setTransform(dpr,0,0,dpr,0,0);g.clearRect(0,0,box,H);
   const cw=(box-HL-8)/n,miss=css('--grid');
-  sm.forEach((r,i)=>{for(let j=0;j<n;j++){g.fillStyle=r?`rgb(${ramp(BB,(r[j]+lim)/(2*lim))})`:miss;g.fillRect(HL+j*cw,HT+i*rh,Math.ceil(cw)+0.5,Math.ceil(rh)+0.5);}});
+  sm.forEach((r,i)=>{for(let j=0;j<n;j++){g.fillStyle=r?`rgb(${ramp(BB,tNorm(r[j],lim))})`:miss;g.fillRect(HL+j*cw,HT+i*rh,Math.ceil(cw)+0.5,Math.ceil(rh)+0.5);}});
   g.fillStyle=css('--ink-3');g.font='11px '+css('--f-data');g.textAlign='right';g.textBaseline='middle';
   years.forEach((y,i)=>{if(y%(years.length>60?20:5)===0)g.fillText(y,HL-6,HT+(i+0.5)*rh);});
   g.textAlign='center';g.textBaseline='top';for(let p=0;p<n;p++){const w=(st.s0+Math.floor((p+0.5)*NW/n))%NW,d=new Date(Date.UTC(2001,0,1+7*w+3)),d0=wDate((st.s0+Math.floor(p*NW/n))%NW);if(n<=13||d0.getUTCDate()<=7)g.fillText(MON[(n<=13?d:d0).getUTCMonth()],HL+(p+0.5)*cw,HT+rh*years.length+6);}
   $('shTitle').textContent=mode==='d'?'Abfluss minus Niederschlag, Jahr für Jahr':`${META[mode].name}: Anteil je Abschnitt, Jahr für Jahr`;
-  $('shSub').textContent=mode==='d'?'Anteil am Jahresabfluss minus Anteil am Jahresniederschlag je Abschnitt, in Prozentpunkten. Blau: mehr Abfluss als Niederschlag (Schmelze, Speicher gibt Wasser ab). Sand: weniger Abfluss als Niederschlag (Wasser bleibt als Schnee, im Boden oder verdunstet).':
-    `Abweichung vom mittleren Anteil ${refFor(mode)[0]}–${refFor(mode)[1]} in Prozentpunkten. Blau: in diesem Abschnitt mehr als üblich, Sand: weniger.`;
+  $('shSub').textContent=mode==='d'?`Anteil am Jahresabfluss minus Anteil am Jahresniederschlag je Abschnitt, in Prozentpunkten. ${PALNAME[st.pal][1]}: mehr Abfluss als Niederschlag (Schmelze, Speicher gibt Wasser ab). ${PALNAME[st.pal][0]}: weniger Abfluss als Niederschlag (Wasser bleibt als Schnee, im Boden oder verdunstet).`:
+    `Abweichung vom mittleren Anteil ${refFor(mode)[0]}–${refFor(mode)[1]} in Prozentpunkten. ${PALNAME[st.pal][1]}: in diesem Abschnitt mehr als üblich, ${PALNAME[st.pal][0]}: weniger.`;
   const lc=$('lg2').getContext('2d');for(let x=0;x<360;x++){lc.fillStyle=`rgb(${ramp(BB,x/359)})`;lc.fillRect(x,0,1,12);}
-  $('shLg').textContent='Prozentpunkte';$('lgt2').innerHTML=[-lim,-lim/2,0,lim/2,lim].map(v=>`<span>${v>0?'+':''}${v.toFixed(1)}</span>`).join('');
+  $('shLg').textContent='Prozentpunkte';$('lgt2').innerHTML=[lim[0],lim[0]/2,0,lim[1]/2,lim[1]].map(v=>`<span>${v>0?'+':''}${v.toFixed(1)}</span>`).join('');
   const tp=$('htip');cvs.onpointermove=e=>{const r=cvs.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;const j=Math.floor((x-HL)/cw),i=Math.floor((y-HT)/rh);if(j<0||j>=n||i<0||i>=years.length||!sm[i]){tp.hidden=true;return;}
     const p=shares('P',years[i],si),q=shares('Q',years[i],si);
     tp.innerHTML=`<b>${years[i]}</b> · ${si.label(j)}<br><span class="k">Wert</span> <b>${sm[i][j]>0?'+':''}${sm[i][j].toFixed(1)} Pp</b>`+(p?`<br><span class="k">Niederschlag</span> ${p[j].toFixed(1)} %`:'')+(q?`<br><span class="k">Abfluss</span> ${q[j].toFixed(1)} %`:'');
@@ -371,7 +377,7 @@ matchMedia('(prefers-color-scheme: dark)').addEventListener('change',all);
 new MutationObserver(all).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 
 
-window.KK={setData(out,names,elev,loc){
+window.KK={redraw(){if(has('T')||has('P'))all();},place(){const st_=['T','P','S','Q'].filter(k=>N[k]).map(k=>META[k].name+' '+N[k]).join(', ');return (N.loc?N.loc+' · ':'')+st_;},setData(out,names,elev,loc){
   V=out;N={T:names.T||'',P:names.P||'',S:names.S||'',Q:names.Q||'',loc:loc&&loc.name?loc.name:''};ELEV=elev||{};
   buildDerived(loc&&loc.lat);finishV();
   const ysMin=Math.min(...Object.values(V).map(v=>v.y0));$('ys').min=ysMin;$('r0').min=ysMin;
