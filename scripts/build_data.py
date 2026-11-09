@@ -2,15 +2,18 @@
 """
 climate-data · Datenaufbereitung
 
-Lädt offene Daten von MeteoSchweiz (Open Data, data.geo.admin.ch) und BAFU
-(hydrodaten.admin.ch, Jahrestabellen) und schreibt kompakte Wochenwerte:
+Das Tool lädt die Wetterdaten von MeteoSchweiz live im Browser. Nur der Abfluss
+muss vorbereitet werden: Das BAFU publiziert die Tageswerte als PDF-Jahrestabellen
+(hydrodaten.admin.ch) und erlaubt keine Abfrage aus dem Browser. Dieses Skript liest
+die Tabellen aus und schreibt kompakte Wochenwerte:
 
-  data/stations.json        alle Stationen mit Koordinaten, Höhe, verfügbaren Grössen
-  data/met/<ABBR>.json      Wochenwerte Temperatur (°C), Niederschlag (mm/7 Tage), Schneehöhe (cm)
+  data/hydro.json           Abflussstationen mit Koordinaten, Einzugsgebiet, Zeitraum
   data/q/<ID>.json          Wochenmittel Abfluss (m³/s)
 
+Optional (--met) lassen sich auch die Wetterdaten vorrechnen; das Tool braucht sie nicht.
+
 Wochen: 52 pro Jahr ab 1. Januar, die letzten 1–2 Tage zählen zur Woche 52.
-Nur Standardbibliothek. Aufruf:  python scripts/build_data.py [--met] [--hydro] [--only ABBR,ID]
+Nur Standardbibliothek. Aufruf:  python scripts/build_data.py [--only 2372,2104]
 """
 import argparse, concurrent.futures as cf, csv, io, json, math, os, re, sys, time, urllib.request, zlib
 from datetime import date
@@ -417,33 +420,25 @@ def build_hydro(only=None):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--met", action="store_true")
-    ap.add_argument("--hydro", action="store_true")
+    ap.add_argument("--met", action="store_true", help="zusätzlich Wetterdaten vorrechnen (vom Tool nicht benötigt, es lädt sie live)")
     ap.add_argument("--only", default="")
     a = ap.parse_args()
-    both = not a.met and not a.hydro
     only = set(x.strip().upper() for x in a.only.split(",") if x.strip()) or None
-    st_path = os.path.join(OUT, "stations.json")
-    st = json.load(open(st_path)) if os.path.exists(st_path) else {"met": [], "hydro": []}
-    if a.met or both:
-        new = build_met(only)
-        if only:
-            keep = {s["id"]: s for s in st["met"]}
-            keep.update({s["id"]: s for s in new})
-            new = list(keep.values())
-        st["met"] = sorted(new, key=lambda s: s["id"])
-    if a.hydro or both:
-        new = build_hydro(only)
-        if only:
-            keep = {s["id"]: s for s in st["hydro"]}
-            keep.update({s["id"]: s for s in new})
-            new = list(keep.values())
-        st["hydro"] = sorted(new, key=lambda s: s["id"])
-    st["updated"] = date.today().isoformat()
     os.makedirs(OUT, exist_ok=True)
-    with open(st_path, "w") as f:
-        json.dump(st, f, ensure_ascii=False, separators=(",", ":"))
-    print(f"done: {len(st['met'])} met, {len(st['hydro'])} hydro")
+    path = os.path.join(OUT, "hydro.json")
+    old = json.load(open(path)) if os.path.exists(path) else {"hydro": []}
+    new = build_hydro(only)
+    if only:
+        keep = {s["id"]: s for s in old.get("hydro", [])}
+        keep.update({s["id"]: s for s in new})
+        new = list(keep.values())
+    with open(path, "w") as f:
+        json.dump({"hydro": sorted(new, key=lambda s: s["id"]), "updated": date.today().isoformat()}, f, ensure_ascii=False, separators=(",", ":"))
+    print(f"done: {len(new)} hydro stations")
+    if a.met:
+        met = build_met(only)
+        with open(os.path.join(OUT, "met.json"), "w") as f:
+            json.dump(met, f, ensure_ascii=False, separators=(",", ":"))
 
 
 if __name__ == "__main__":

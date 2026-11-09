@@ -17,16 +17,15 @@ Interaktives Web-Tool: Ort auf der Karte wählen, passende Stationen für **Temp
 
 ## Daten
 
-- **MeteoSchweiz Open Data** (data.geo.admin.ch): SwissMetNet, Niederschlags- und Schneemessnetz, Swiss NBCN (homogenisierte Temperatur).
-- **BAFU Hydrodaten**: Tagesmittel Abfluss aus den publizierten Jahrestabellen (meist ab 1993). Ältere Daten sind beim BAFU bestellbar.
+- **MeteoSchweiz Open Data** (data.geo.admin.ch) wird **live** abgefragt: Stationsliste (~480 Stationen) und Tageswerte der gewählten Stationen werden direkt im Browser geladen und zu Wochenwerten verrechnet (rund 1 s). SwissMetNet, Niederschlags- und Schneemessnetz, Swiss NBCN (homogenisierte Temperatur).
+- **BAFU Hydrodaten**: Tagesmittel Abfluss aus den publizierten Jahrestabellen (meist ab 1993). Das BAFU erlaubt keine Browser-Abfrage, deshalb liest eine GitHub Action die Tabellen einmal pro Woche aus und legt nur kleine Wochenwerte in `data/` ab (insgesamt wenige MB). Ältere Daten sind beim BAFU bestellbar.
 - Schneeanteil und Bodenfeuchte sind **abgeleitet/modelliert** (siehe «Daten und Methode» im Tool).
 
-`scripts/build_data.py` lädt alles und schreibt kompakte Wochenwerte nach `data/`. Die GitHub Action *Daten aktualisieren* läuft jeden Montag und lässt sich manuell starten (auch nur für einzelne Stationen).
+`scripts/build_data.py` liest die BAFU-Tabellen und schreibt `data/hydro.json` und `data/q/<ID>.json`. Die GitHub Action *Abflussdaten aktualisieren* läuft jeden Montag und lässt sich manuell starten (auch nur für einzelne Stationen). Beim ersten Lauf werden alle Jahre gelesen (dauert lange), danach nur noch die letzten zwei Jahre.
 
 ```bash
-python scripts/build_data.py            # alles
-python scripts/build_data.py --met      # nur MeteoSchweiz
-python scripts/build_data.py --hydro --only 2372
+python scripts/build_data.py                 # alle Abflussstationen
+python scripts/build_data.py --only 2372     # nur Linth, Mollis
 ```
 
 Nur Python-Standardbibliothek. Lokal ansehen: `python -m http.server` und http://localhost:8000 öffnen.

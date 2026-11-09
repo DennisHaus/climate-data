@@ -14,6 +14,49 @@ function wgs84ToLv95(lat,lon){const p=(lat*3600-169028.66)/10000,l=(lon*3600-267
   const E=2600072.37+211455.93*l-10938.51*l*p-0.36*l*p*p-44.54*l*l*l;
   const N=1200147.07+308807.95*p+3745.25*l*l+76.63*p*p-194.56*l*l*p+119.79*p*p*p;return [E,N];}
 async function jget(url){const r=await fetch(url);if(!r.ok)throw new Error(r.status+' '+url);return r.json();}
+async function tget(url){const r=await fetch(url);if(!r.ok){if(r.status===404)return null;throw new Error(r.status+' '+url);}return new TextDecoder('windows-1252').decode(await r.arrayBuffer());}
+
+/* ---------- MeteoSchweiz live: station list and daily data ---------- */
+const MS='https://data.geo.admin.ch/ch.meteoschweiz.';
+// variable -> candidate sources in order of preference [collection, column, homogenised]
+const SRC={T:[['ogd-nbcn','ths200d0',1],['ogd-smn','tre200d0',0]],
+           P:[['ogd-smn','rre150d0',0],['ogd-smn-precip','rre150d0',0],['ogd-nime','rre150d0',0]],
+           S:[['ogd-nime','hto000d0',0],['ogd-smn','htoautd0',0]]};
+const COLLS=['ogd-smn','ogd-nbcn','ogd-smn-precip','ogd-nime'];
+function csvRows(t){const L=t.split(/\r?\n/).filter(Boolean);const h=L[0].split(';');return L.slice(1).map(l=>{const a=l.split(';'),o={};h.forEach((k,i)=>o[k]=a[i]);return o;});}
+const yr=s=>s?+s.slice(6,10):null;
+async function metStations(){
+  const cacheKey='climate-data-stations-v1';
+  try{const c=JSON.parse(sessionStorage.getItem(cacheKey)||'null');if(c&&Date.now()-c.t<6*3600e3)return c.d;}catch(e){}
+  const res=await Promise.all(COLLS.flatMap(c=>[tget(`${MS}${c}/${c}_meta_stations.csv`),tget(`${MS}${c}/${c}_meta_datainventory.csv`)]));
+  const st={},now=new Date().getFullYear();
+  COLLS.forEach((c,i)=>{const meta=res[2*i],inv=res[2*i+1];if(!meta||!inv)return;
+    for(const r of csvRows(meta)){const id=r.station_abbr;if(!id)continue;const s=st[id]||(st[id]={id,name:r.station_name,kt:r.station_canton,lat:+r.station_coordinates_wgs84_lat,lon:+r.station_coordinates_wgs84_lon,elev:Math.round(+r.station_height_masl),v:{}});}
+    const inv_={};for(const r of csvRows(inv))inv_[r.station_abbr+'|'+r.parameter_shortname]=r;
+    for(const k in SRC)for(const [coll,col,h] of SRC[k]){if(coll!==c)continue;
+      for(const id in st){const r=inv_[id+'|'+col];if(!r)continue;const y0=yr(r.data_since),y1=yr(r.data_till)||now;if(!y0||y1-y0<10)continue;
+        const old=st[id].v[k],cand=[y0,y1,h,coll,col];
+        if(!old||(h&&!old[2])||(!old[2]&&!h&&y1-y0>old[1]-old[0]))st[id].v[k]=cand;}}});
+  const d=Object.values(st).filter(s=>Object.keys(s.v).length&&isFinite(s.lat)&&isFinite(s.lon));
+  try{sessionStorage.setItem(cacheKey,JSON.stringify({t:Date.now(),d}));}catch(e){}
+  return d;
+}
+const NWK=52;
+function weekGrid(daily,how){ // daily: [[y,doy,value]] -> {y0,g}
+  const acc={};for(const [y,doy,v] of daily){const a=acc[y]||(acc[y]=Array.from({length:NWK},()=>[0,0]));const w=Math.min(Math.floor(doy/7),NWK-1);a[w][0]+=v;a[w][1]++;}
+  const ys=Object.keys(acc).map(Number).filter(y=>acc[y].filter(x=>x[1]>=4).length>=8).sort((a,b)=>a-b);if(!ys.length)return null;
+  const g=[];for(let y=ys[0];y<=ys[ys.length-1];y++){const a=acc[y];g.push(a?a.map(([s,n])=>n<4?null:how==='sum7'?Math.round(s*7/n*10)/10:Math.round(s/n*10)/10):Array(NWK).fill(null));}
+  return {y0:ys[0],g};
+}
+async function metSeries(id,k){
+  const s=ST.met.find(x=>x.id===id);if(!s||!s.v[k])return null;const [,, ,coll,col]=s.v[k];const ab=id.toLowerCase();
+  const parts=await Promise.all(['historical','recent'].map(p=>tget(`${MS}${coll}/${ab}/${coll}_${ab}_d_${p}.csv`)));
+  const daily=[];
+  for(const t of parts){if(!t)continue;const L=t.split(/\r?\n/);const h=L[0].split(';');const ti=h.indexOf('reference_timestamp'),ci=h.indexOf(col);if(ci<0)continue;
+    for(let i=1;i<L.length;i++){const a=L[i].split(';');const v=a[ci];if(v===undefined||v===''||v==='-')continue;const ts=a[ti];const d=+ts.slice(0,2),m=+ts.slice(3,5),y=+ts.slice(6,10);
+      const doy=Math.round((Date.UTC(y,m-1,d)-Date.UTC(y,0,1))/864e5);daily.push([y,doy,+v]);}}
+  return weekGrid(daily,k==='P'?'sum7':'mean');
+}
 
 /* ---------- candidates ---------- */
 function len(s,k){const v=s.v&&s.v[k];return v?v[1]-v[0]+1:0;}
@@ -90,8 +133,8 @@ async function loadData(){
   const status=document.getElementById('selNote');status.textContent='Daten werden geladen …';
   try{
     const out={},names={},elev={};
-    const jobs=['T','P','S'].filter(k=>SEL[k]).map(async k=>{const j=await loadSeries('met',SEL[k]);if(j[k]){out[k]={y0:j[k].y0,g:j[k].g};if(k==='T')elev.Th=!!j[k].h;}
-      const s=ST.met.find(x=>x.id===SEL[k]);names[k]=s?s.name:SEL[k];elev[k]=s?s.elev:null;});
+    const jobs=['T','P','S'].filter(k=>SEL[k]).map(async k=>{const key=k+SEL[k];if(!cache[key])cache[key]=metSeries(SEL[k],k);const gr=await cache[key];
+      const s=ST.met.find(x=>x.id===SEL[k]);if(gr)out[k]=gr;if(k==='T')elev.Th=!!(s&&s.v.T&&s.v.T[2]);names[k]=s?s.name:SEL[k];elev[k]=s?s.elev:null;});
     if(SEL.Q)jobs.push(loadSeries('q',SEL.Q).then(j=>{out.Q={y0:j.y0,g:j.g};const s=ST.hydro.find(x=>x.id===SEL.Q);names.Q=s?s.name:SEL.Q;}));
     await Promise.all(jobs);
     window.KK.setData(out,names,elev,LOC);
@@ -113,9 +156,13 @@ function initSearch(){
 
 /* ---------- boot ---------- */
 async function boot(){
-  try{ST=await jget(DATA+'stations.json');}catch(e){document.getElementById('selNote').textContent='Stationsliste fehlt (data/stations.json).';return;}
+  document.getElementById('selNote').textContent='Stationsliste wird bei MeteoSchweiz abgefragt …';
+  ST={met:[],hydro:[]};
+  const [met,hyd]=await Promise.all([metStations().catch(e=>{console.error(e);return [];}),jget(DATA+'hydro.json').catch(()=>({hydro:[],updated:null}))]);
+  ST.met=met;ST.hydro=hyd.hydro||[];ST.updated=hyd.updated;
+  if(!ST.met.length){document.getElementById('selNote').textContent='Die Stationsliste von MeteoSchweiz konnte nicht geladen werden.';}
   document.getElementById('updated').textContent=ST.updated?ST.updated.split('-').reverse().join('.'):'–';
-  document.getElementById('nSt').textContent=`${ST.met.length} Wetterstationen, ${ST.hydro.length} Abflussstationen`;
+  document.getElementById('nSt').textContent=`${ST.met.length} Wetterstationen (live von MeteoSchweiz), ${ST.hydro.length} Abflussstationen`;
   initMap();initSearch();
   for(const k of ['T','P','S','Q'])document.getElementById('sel'+k).addEventListener('change',e=>{SEL[k]=e.target.value||null;drawSelection();loadData();});
   const q=new URLSearchParams(location.search);

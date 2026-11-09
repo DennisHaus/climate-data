@@ -120,8 +120,8 @@
   <details>
     <summary>Daten und Methode</summary>
     <ul>
-      <li><b>Wetterdaten:</b> MeteoSchweiz Open Data (data.geo.admin.ch): SwissMetNet, Niederschlags- und Schneemessnetz sowie Swiss NBCN. Temperatur wird, wo vorhanden, aus den homogenisierten NBCN-Reihen genommen. Niederschlag und Schnee wie gemessen.</li>
-      <li><b>Abfluss:</b> BAFU, Tagesmittel aus den öffentlich publizierten Jahrestabellen (hydrodaten.admin.ch), in der Regel ab 1993. Viele Flüsse sind durch Kraftwerke und Seeregulierung beeinflusst; das Einzugsgebiet steht in der Stationsliste.</li>
+      <li><b>Wetterdaten:</b> werden bei jeder Abfrage live von MeteoSchweiz Open Data (data.geo.admin.ch) geladen und im Browser zu Wochenwerten verrechnet: SwissMetNet, Niederschlags- und Schneemessnetz sowie Swiss NBCN. Temperatur wird, wo vorhanden, aus den homogenisierten NBCN-Reihen genommen. Niederschlag und Schnee wie gemessen.</li>
+      <li><b>Abfluss:</b> BAFU, Tagesmittel aus den öffentlich publizierten Jahrestabellen (hydrodaten.admin.ch), in der Regel ab 1993. Das BAFU erlaubt keine direkte Abfrage aus dem Browser; die Tabellen werden deshalb einmal pro Woche von einer GitHub Action ausgelesen und als kleine Wochenwerte im Repository abgelegt. Viele Flüsse sind durch Kraftwerke und Seeregulierung beeinflusst; das Einzugsgebiet steht in der Stationsliste.</li>
       <li><b>Wochen:</b> 52 Wochen ab 1. Januar, die letzten 1–2 Tage des Jahres zählen zur Woche 52. Temperatur und Schnee als Wochenmittel, Niederschlag als Wochensumme, Abfluss als Wochenmittel.</li>
       <li><b>Referenz:</b> frei wählbar, Standard 1961–1990. Liegt sie ausserhalb einer Messreihe, wird für diese Grösse der früheste verfügbare Zeitraum gleicher Länge verwendet.</li>
       <li><b>Kalender:</b> Temperatur als Abweichung in °C (Farbskala nach Ed Hawkins), Niederschlag und Abfluss als Verhältnis zur Referenz, Schnee als Differenz in cm, Schneeanteil und Bodenfeuchte in Prozentpunkten. Glättung als zentriertes gleitendes Mittel über Jahre und (zyklisch) über Wochen.</li>
@@ -130,7 +130,7 @@
       <li><b>Paris-Ziele:</b> +1.5 °C und +2 °C beziehen sich auf das globale Mittel gegenüber vorindustriell. Sie werden eingezeichnet, wenn die Referenz vor 1901 endet. Der Alpenraum erwärmt sich etwa doppelt so stark.</li>
     </ul>
   </details>
-  <p class="foot">Daten aktualisiert: <span id="updated">–</span> · <span id="nSt"></span> · Quellen: <a href="https://www.meteoschweiz.admin.ch/service-und-publikationen/service/open-data.html">MeteoSchweiz Open Data</a>, <a href="https://www.hydrodaten.admin.ch">BAFU Hydrodaten</a>, Karte © <a href="https://www.swisstopo.admin.ch">swisstopo</a> · Code: <a href="https://github.com/DennisHaus/climate-data">github.com/DennisHaus/climate-data</a></p>
+  <p class="foot">Abflussdaten aktualisiert: <span id="updated">–</span> · <span id="nSt"></span> · Quellen: <a href="https://www.meteoschweiz.admin.ch/service-und-publikationen/service/open-data.html">MeteoSchweiz Open Data</a>, <a href="https://www.hydrodaten.admin.ch">BAFU Hydrodaten</a>, Karte © <a href="https://www.swisstopo.admin.ch">swisstopo</a> · Code: <a href="https://github.com/DennisHaus/climate-data">github.com/DennisHaus/climate-data</a></p>
 </section>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
