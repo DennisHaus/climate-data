@@ -71,6 +71,8 @@
       <div class="range"><input id="r0" type="range" min="1878" max="1996" step="1" value="1961"><output id="r0o"></output></div></label>
     <label class="ctl"><span>Referenz Länge</span>
       <div class="range"><input id="rl" type="range" min="10" max="60" step="1" value="30"><output id="rlo"></output></div></label>
+    <div class="ctl"><span>Kurze Reihen ergänzen</span>
+      <div class="seg" role="group" id="fillSeg" title="Temperatur und Niederschlag von Stationen mit kurzer Messreihe für die Referenzperiode aus Langzeitstationen rekonstruieren"><button type="button" data-f="warn">Nein, nur warnen</button><button type="button" data-f="region">Region</button><button type="button" data-f="ch">Schweiz</button></div></div>
   </div>
   <div class="controls">
     <label class="ctl"><span>Ab Jahr</span>
@@ -86,10 +88,12 @@
   <div class="vizbox" id="vizbox"><canvas id="cal" aria-label="Kalender Jahr mal Woche"></canvas><div class="tip" id="tip" hidden></div></div>
   <div class="legend"><span id="lgTitle"></span><div class="lgscale"><canvas id="lg" width="360" height="12"></canvas><div class="lgticks" id="lgt"></div></div></div>
   <p class="note" id="calNote"></p>
+  <div id="refWarn"></div>
 </section>
 
 <section class="sec" id="landSec">
   <div class="sechead"><h2>Landschaft · aktuelle Tendenzen</h2><span class="note">Letzte 10 Jahre (2016–2025) gegenüber der gewählten Referenzperiode</span></div>
+  <div id="landWarn"></div>
   <div class="tiles" id="landTiles"></div>
   <div class="panel">
     <p class="lede">Kennzahlen, die für Landschafts- und Freiraumplanung zählen: Wie weit ist das Klima bergauf gewandert, wie lang ist die Wachstumszeit, wie oft gibt es Spätfrost, Hitze, Trockenstress und Niedrigwasser?</p>
@@ -166,6 +170,10 @@
       <li><b>Vegetationsperiode:</b> Beginn mit den ersten 6 Tagen in Folge über 5 °C Tagesmittel, Ende mit den ersten 6 Tagen in Folge unter 5 °C ab Juli. Spätfrost: Tage mit Minimum unter 0 °C zwischen Vegetationsbeginn und Ende Juni. Hitze: Sommertage (Maximum ≥ 25 °C), Hitzetage (≥ 30 °C), Tropennächte (Minimum ≥ 20 °C). Berechnet aus Tageswerten der Temperaturstation; Minimum und Maximum sind teils erst ab dem 20. Jahrhundert verfügbar.</li>
       <li><b>Trockenstress:</b> Klimatische Wasserbilanz (Niederschlag minus Verdunstung nach Hamon) über 3 Monate, je Kalendermonat standardisiert an der Referenz (vereinfachter SPEI-3, Normalverteilung statt Log-Logistik).</li>
       <li><b>Niedrigwasser:</b> aus Wochenmitteln: tiefstes Wochenmittel pro Jahr und der Wert, der in 95 % der Wochen erreicht wird (Näherung an Q347 aus Tageswerten).</li>
+      <li><b>Warum ist der Boden mal im Sommer, mal erst im Herbst am trockensten?</b> Der Boden ist ein Speicher: Er trocknet aus, solange die Verdunstung grösser ist als Niederschlag plus Schneeschmelze, und ist dann am trockensten, wenn der Niederschlag die Verdunstung wieder übertrifft. In Lagen mit nassen Sommern (Voralpen, Linthebene, Säntisgebiet) dauert das Defizit nur kurz; das Minimum ist eine kleine Delle im Juli/August. In trockeneren Lagen (Wallis, Graubünden, Basel, Schaffhausen) verliert der Boden den ganzen Sommer Wasser; je trockener er wird, desto weniger verdunstet er, er trocknet also langsamer, aber länger. Erst mit Herbstregen und abnehmender Verdunstung kehrt die Bilanz, das Minimum liegt im September bis November. In höheren Lagen füllt die Schneeschmelze den Boden bis in den Juni, das Austrocknen beginnt später. Im Tessin ist der Herbst die nasseste Zeit, das Minimum liegt meist im August.</li>
+      <li><b>Bodenfeuchte im Kalender:</b> Die Farbe zeigt die Abweichung von der Referenz, nicht den Zustand. Ein trockenes Signal im Oktober/November heisst: Der Boden ist heute im Herbst trockener als früher. Typische Gründe sind die längere Vegetationsperiode mit Verdunstung bis in den Oktober, ein Sommerdefizit, das bis zu den Herbstregen nachwirkt, und an manchen Orten trockenere Herbstmonate. Wo die Sommer nass bleiben, zeigt sich die Veränderung eher im Hochsommer.</li>
+      <li><b>Grenzen des Bodenmodells:</b> überall 150 mm Speicher; Bodenart, Grundwasser, Bewässerung und Hanglage fehlen. Die Verdunstung nach Hamon unterschätzt sonnige, windige oder föhnige Lagen (z. B. Wallis), der Effekt ist dort eher stärker als gezeigt. Temperatur und Niederschlag stammen oft von zwei Stationen, die Temperatur wird mit der Höhe umgerechnet.</li>
+      <li><b>Zu kurze Messreihen:</b> Eine Referenzperiode ist erst aussagekräftig, wenn sie zu mindestens zwei Dritteln gemessen ist (bei 30 Jahren also 20 Jahre). Ist das nicht der Fall, erscheint ein Hinweis. Für Temperatur und Niederschlag lässt sich die Referenz dann ergänzen: Mit «Region» werden die drei nächsten Langzeitstationen (bis 120 km, homogenisierte Temperatur bevorzugt) verwendet, mit «Schweiz» bis zu acht über die Schweiz verteilte Langzeitstationen (Basel, Bern, Genf, Lugano, Sion, Davos, Zürich, Neuenburg u. a.). Rekonstruiert wird mit der Differenzen- bzw. Quotientenmethode: Für jede Kalenderwoche wird der mittlere Unterschied (Temperatur) bzw. das Verhältnis (Niederschlag) zwischen der Station und den Langzeitstationen in den gemeinsam gemessenen Jahren bestimmt und auf die früheren Jahre übertragen. Rekonstruierte Jahre sind im Kalender blass und in den Diagrammen grau hinterlegt. «Region» ist meist genauer als «Schweiz», weil Nachbarstationen ähnliche Wetterlagen haben; die Schweiz-Variante hilft, wenn in der Nähe keine Langzeitstation steht. Für Schnee und Abfluss ist keine Ergänzung möglich: Schneehöhe ist zu lokal, und vor 1993 fehlen offene Abflussdaten. Tageswert-Kennzahlen (Vegetationsperiode, Frost, Hitze) werden nie rekonstruiert.</li>
       <li><b>Paris-Ziele:</b> +1.5 °C und +2 °C beziehen sich auf das globale Mittel gegenüber vorindustriell. Sie werden eingezeichnet, wenn die Referenz vor 1901 endet. Der Alpenraum erwärmt sich etwa doppelt so stark.</li>
     </ul>
   </details>

@@ -15,6 +15,10 @@ Interaktives Web-Tool: Ort auf der Karte wählen, passende Stationen für **Temp
 | Niederschlag & Abfluss | Anteile über das Jahr in 2–52 Abschnitten, Raster «Abfluss minus Niederschlag», Summenkurven |
 | Kennzahlen | Jahresmittel (inkl. Paris-Ziele bei Referenz vor 1901), Schneeschmelze, Bodenfeuchte, Abfluss-Schwerpunkt u. a. |
 
+## Kurze Messreihen
+
+Ist die gewählte Referenzperiode (Standard 1961–1990) an einer Station zu weniger als zwei Dritteln gemessen, warnt das Tool. Temperatur und Niederschlag lassen sich dann aus Langzeitstationen der Region oder der ganzen Schweiz rekonstruieren (Differenzen- bzw. Quotientenmethode je Kalenderwoche); rekonstruierte Jahre sind markiert.
+
 ## Daten
 
 - **MeteoSchweiz Open Data** (data.geo.admin.ch) wird **live** abgefragt: Stationsliste (~480 Stationen) und Tageswerte der gewählten Stationen werden direkt im Browser geladen und zu Wochenwerten verrechnet (rund 1 s). SwissMetNet, Niederschlags- und Schneemessnetz, Swiss NBCN (homogenisierte Temperatur).

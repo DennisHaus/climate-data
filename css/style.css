@@ -120,3 +120,6 @@ details li{margin-bottom:5px}
 .tile{background:var(--surface);border:1px solid var(--rule);margin:-1px 0 0 -1px;padding:14px 16px;display:flex;flex-direction:column;gap:6px;min-width:0}
 .tile .big{font-size:24px;font-weight:800;letter-spacing:-.04em;line-height:1.05;color:var(--ink);font-variant-numeric:tabular-nums}
 .tile .note{font-size:10px}
+
+.warn{border:1px solid #d7b66d;color:#e9d7a8;background:rgba(215,182,109,.07);padding:10px 12px;font-size:10.5px;line-height:1.6}
+.warn b{color:#f2e3b8}

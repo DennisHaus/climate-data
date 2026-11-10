@@ -91,10 +91,11 @@ function draw(){
   cv.style.height=H+'px';cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);
   ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,W,H);
   const ink3=css('--ink-3'),ink2=css('--ink-2'),missing=css('--grid');ctx.font='11px '+css('--f-data');
-  const fill=x=>{if(x==null)ctx.fillStyle=missing;else ctx.fillStyle=`rgb(${colFor(x,LIM)})`;};
+  const rec=v.recon?v.recon.y1:-1e9;
+  const fill=(x,yy)=>{ctx.globalAlpha=yy!=null&&yy<=rec?0.4:1;if(x==null)ctx.fillStyle=missing;else ctx.fillStyle=`rgb(${colFor(x,LIM)})`;};
   if(!ring){
     const L=46,R=8,T=6,B=24,pw=W-L-R,ph=H-T-B,cw=pw/n,rh=ph/NW;geo={ring:false,L,T,cw,rh,i0,n};
-    for(let j=0;j<n;j++)for(let w=0;w<NW;w++){fill(F[i0+j][w]);ctx.fillRect(L+j*cw,T+w*rh,Math.ceil(cw+0.6),Math.ceil(rh+0.6));}
+    for(let j=0;j<n;j++)for(let w=0;w<NW;w++){fill(F[i0+j][w],v.y0+i0+j);ctx.fillRect(L+j*cw,T+w*rh,Math.ceil(cw+0.6),Math.ceil(rh+0.6));}
     ctx.fillStyle=ink3;ctx.textAlign='right';ctx.textBaseline='middle';
     MON.forEach((m,i)=>{if(W<520&&i%2)return;ctx.fillText(m,L-8,T+(monthStartWeek[i]+2)*rh);});
     ctx.textAlign='center';ctx.textBaseline='top';const step=n>120?(W<520?40:20):n>60?(W<520?20:10):(W<520?10:5);
@@ -102,7 +103,7 @@ function draw(){
   }else{
     const cx=W/2,cy=H/2,R1=Math.min(W,H)/2-26,R0=R1*0.14,g=st.gam,rad=t=>R0+(R1-R0)*Math.pow(t,g);geo={ring:true,cx,cy,R0,R1,g,i0,n};
     for(let j=0;j<n;j++){const r0=rad(j/n),r1=rad((j+1)/n)+0.4;
-      for(let w=0;w<NW;w++){fill(F[i0+j][w]);const a0=-Math.PI/2+w/NW*2*Math.PI,a1=-Math.PI/2+(w+1)/NW*2*Math.PI+0.004;ctx.beginPath();ctx.arc(cx,cy,r1,a0,a1);ctx.arc(cx,cy,r0,a1,a0,true);ctx.closePath();ctx.fill();}}
+      for(let w=0;w<NW;w++){fill(F[i0+j][w],v.y0+i0+j);const a0=-Math.PI/2+w/NW*2*Math.PI,a1=-Math.PI/2+(w+1)/NW*2*Math.PI+0.004;ctx.beginPath();ctx.arc(cx,cy,r1,a0,a1);ctx.arc(cx,cy,r0,a1,a0,true);ctx.closePath();ctx.fill();}}
     ctx.strokeStyle=css('--surface');ctx.lineWidth=1;ctx.globalAlpha=0.6;
     for(let yr=Math.ceil((ys+1)/10)*10;yr<=v.y1;yr+=10){const r=rad((yr-ys)/n);ctx.beginPath();ctx.arc(cx,cy,r,0,2*Math.PI);ctx.stroke();}
     ctx.globalAlpha=1;ctx.fillStyle=ink3;ctx.textAlign='center';ctx.textBaseline='middle';
@@ -112,10 +113,11 @@ function draw(){
     ctx.font='10px '+css('--f-data');ctx.fillStyle=css('--ink');ctx.globalAlpha=0.75;ctx.textAlign='left';
     for(let yr=Math.ceil((ys+1)/10)*10;yr<=v.y1;yr+=10){const r=rad((yr-ys)/n);if(r-R0<14)continue;ctx.fillText(yr,cx+3,cy-r+7);}ctx.globalAlpha=1;
   }
+  ctx.globalAlpha=1;
   drawLegend();
   const [a,b,fb]=refFor(k),m=META[k];
   const what=m.kind==='anom'?`Abweichung vom Wochenmittel ${a}–${b}`:m.kind==='diff'?`Differenz zur mittleren Schneehöhe ${a}–${b}`:m.kind==='pp'?`Differenz zum Wochenmittel ${a}–${b} in Prozentpunkten`:`Verhältnis zum Wochenmittel ${a}–${b}`;
-  $('calNote').textContent=`${m.name} ${m.where}, ${ys}–${v.y1}. ${what}${fb?` (gewählte Referenz ${st.r0}–${st.r0+st.rl-1} liegt ausserhalb der Messreihe)`:''}, geglättet über ${st.sy} Jahr${st.sy>1?'e':''} und ${st.sw} Woche${st.sw>1?'n':''}.`+(ring?' Innen das Startjahr, aussen heute, Januar oben, im Uhrzeigersinn.':'')+(m.kind==='anom'?' Farbskala nach Ed Hawkins.':` ${PALNAME[st.pal][0]}: weniger, ${PALNAME[st.pal][1]}: mehr.`);
+  $('calNote').textContent=`${m.name} ${m.where}, ${ys}–${v.y1}. ${what}${fb?` (gewählte Referenz ${st.r0}–${st.r0+st.rl-1} liegt ausserhalb der Messreihe)`:''}, geglättet über ${st.sy} Jahr${st.sy>1?'e':''} und ${st.sw} Woche${st.sw>1?'n':''}.`+(ring?' Innen das Startjahr, aussen heute, Januar oben, im Uhrzeigersinn.':'')+(v.recon?` Blass: ${v.recon.y1<ys?'':ys+'–'+v.recon.y1+' '}rekonstruiert aus ${v.recon.src}.`:'')+(m.kind==='anom'?' Farbskala nach Ed Hawkins.':` ${PALNAME[st.pal][0]}: weniger, ${PALNAME[st.pal][1]}: mehr.`);
 }
 function drawLegend(){const c=$('lg'),g=c.getContext('2d'),anom=META[st.v].kind==='anom';for(let x=0;x<360;x++){g.fillStyle=`rgb(${anom?ramp(HK,x/359):ramp(BB,x/359)})`;g.fillRect(x,0,1,12);}
   $('lgTitle').textContent=META[st.v].name+' gegenüber Referenz';const t=[LIM[0],LIM[0]/2,0,LIM[1]/2,LIM[1]];
@@ -149,7 +151,7 @@ on('#heatMode button',b=>{st.hm=b.dataset.h;drawSeg();});
 on('#segVar button',b=>{st.sv=b.dataset.s;drawCum();});
 $('reset').onclick=()=>{Object.assign(st,DEF);BB=PALS.gtb.map(hex);syncControls();save();all();};
 const slide=(id,fn)=>$(id).oninput=e=>{st[id]=+e.target.value;if(id==='r0'&&st.r0+st.rl-1>2025)st.rl=2026-st.r0;if(id==='rl'&&st.r0+st.rl-1>2025)st.r0=2026-st.rl;syncControls();save();fn();};
-slide('r0',()=>{draw();drawLand();drawJG();drawCharts();drawSeg();});slide('rl',()=>{draw();drawLand();drawJG();drawCharts();drawSeg();});
+slide('r0',()=>{refWarnings();draw();drawLand();drawJG();drawCharts();drawSeg();});slide('rl',()=>{refWarnings();draw();drawLand();drawJG();drawCharts();drawSeg();});
 slide('ys',draw);slide('gam',draw);slide('sy',draw);slide('sw',draw);slide('sm',drawCharts);slide('sm2',drawSeg);
 $('segStart').innerHTML=MON.map((m,i)=>`<option value="${Math.round(monthStartWeek[i])}">1. ${m}</option>`).join('');
 $('segStart').onchange=e=>{st.s0=+e.target.value;save();drawSeg();};
@@ -172,6 +174,7 @@ function lineChart(el,cfg){
   const X=i=>L+i/(YRS.length-1)*pw,Yv=v=>T+(1-(v-lo)/(hi-lo))*ph;
   let s=`<svg viewBox="0 0 ${Wd} ${Ht}" role="img" aria-label="${cfg.title}">`;
   (cfg.ticks||niceTicks(lo,hi,4)).forEach(t=>{s+=`<line x1="${L}" x2="${L+pw}" y1="${Yv(t)}" y2="${Yv(t)}" stroke="var(--grid)"/><text x="${L-6}" y="${Yv(t)+3.5}" text-anchor="end">${cfg.tf?cfg.tf(t):t}</text>`;});
+  if(cfg.shade&&cfg.shade[1]>=YRS[0]){const xa=X(Math.max(0,cfg.shade[0]-YRS[0])),xb=X(Math.min(YRS.length-1,cfg.shade[1]-YRS[0]));s+=`<rect x="${xa}" y="${T}" width="${Math.max(0,xb-xa)}" height="${ph}" fill="var(--ink)" fill-opacity="0.06"/><text x="${xa+4}" y="${T+10}">rekonstruiert</text>`;}
   if(cfg.zero!=null)s+=`<line x1="${L}" x2="${L+pw}" y1="${Yv(cfg.zero)}" y2="${Yv(cfg.zero)}" stroke="var(--ink-3)"/>`;
   const span=YRS[YRS.length-1]-YRS[0],step=span>100?40:span>50?20:10;
   for(let yr=Math.ceil(YRS[0]/step)*step;yr<=YRS[YRS.length-1];yr+=step){const x=X(yr-YRS[0]);s+=`<text x="${x}" y="${Ht-6}" text-anchor="middle">${yr}</text>`;}
@@ -347,21 +350,22 @@ function drawSeg(){
 }
 
 /* ---------- yearly indicators from weekly data ---------- */
+const SH=k=>V[k]&&V[k].recon?[V[k].y0,V[k].recon.y1]:null;
 function yearly(k,fn){if(!has(k))return {years:[],vals:[]};const v=V[k],years=[],vals=[];for(let y=v.y0;y<=Math.min(v.y1,2025);y++){const row=v.g[y-v.y0];if(row.filter(x=>x!=null).length<50){continue;}years.push(y);vals.push(fn(row,y));}return {years,vals};}
 function drawCharts(){
   const g=$('charts');g.innerHTML='';const add=(cfg,wide)=>{if(!cfg.years||cfg.years.length<8)return;const d=document.createElement('div');d.className='chart'+(wide?' wide':'');g.appendChild(d);lineChart(d,cfg);};
   const c1=css('--s1'),c2=css('--s2'),c3=css('--s3');
   // temperature anomaly vs ref
   {const [a,b]=refFor('T');const t=yearly('T',r=>r.reduce((s,x)=>s+(x??0),0)/r.filter(x=>x!=null).length);let ref=0,c=0;t.years.forEach((y,i)=>{if(y>=a&&y<=b){ref+=t.vals[i];c++;}});ref/=c;
-   add({years:t.years,title:`Jahresmitteltemperatur ${N.T} gegenüber ${a}–${b}`,sub:(ELEV.Th?'°C, homogenisiert. ':'°C, nicht homogenisiert. ')+(b<=1900?'Gestrichelt: Paris-Ziele (globales Mittel); der Alpenraum erwärmt sich etwa doppelt so stark.':`Für den Vergleich mit den Paris-Zielen die Referenz auf ${V.T.y0}–1900 stellen.`),
+   add({shade:SH('T'),years:t.years,title:`Jahresmitteltemperatur ${N.T} gegenüber ${a}–${b}`,sub:(ELEV.Th?'°C, homogenisiert. ':'°C, nicht homogenisiert. ')+(b<=1900?'Gestrichelt: Paris-Ziele (globales Mittel); der Alpenraum erwärmt sich etwa doppelt so stark.':`Für den Vergleich mit den Paris-Zielen die Referenz auf ${V.T.y0}–1900 stellen.`),
      series:[{name:'Abweichung',v:t.vals.map(x=>x-ref),c:c2}],zero:0,tf:x=>(x>0?'+':'')+x,vf:x=>(x>0?'+':'')+x.toFixed(2)+' °C',w:1080,h:230,refLines:b<=1900?[{v:1.5,label:'+1.5 °C'},{v:2,label:'+2 °C'}]:[]},true);}
-  {const p=yearly('P',r=>r.reduce((s,x)=>s+(x??0),0)*365/364);add({years:p.years,title:`Jahresniederschlag ${N.P}`,sub:'mm pro Jahr',series:[{name:'Summe',v:p.vals,c:c1}],vf:x=>Math.round(x)+' mm'});}
-  {const p=yearly('P',r=>{let a=0,t=0;r.forEach((x,w)=>{t+=x;const m=wDate(w+0.5).getUTCMonth();if(m>=5&&m<=7)a+=x;});return a/t*100;});add({years:p.years,title:'Sommeranteil Niederschlag',sub:`% des Jahresniederschlags in Juni–August, ${N.P}`,series:[{name:'Sommer',v:p.vals,c:c1}],vf:x=>x.toFixed(0)+' %'});}
+  {const p=yearly('P',r=>r.reduce((s,x)=>s+(x??0),0)*365/364);add({shade:SH('P'),years:p.years,title:`Jahresniederschlag ${N.P}`,sub:'mm pro Jahr',series:[{name:'Summe',v:p.vals,c:c1}],vf:x=>Math.round(x)+' mm'});}
+  {const p=yearly('P',r=>{let a=0,t=0;r.forEach((x,w)=>{t+=x;const m=wDate(w+0.5).getUTCMonth();if(m>=5&&m<=7)a+=x;});return a/t*100;});add({shade:SH('P'),years:p.years,title:'Sommeranteil Niederschlag',sub:`% des Jahresniederschlags in Juni–August, ${N.P}`,series:[{name:'Sommer',v:p.vals,c:c1}],vf:x=>x.toFixed(0)+' %'});}
   {const s=yearly('S',r=>{let w0=-1;for(let w=5;w<NW;w++){if(r[w]!=null&&r[w]<5){let ok=true;for(let j=w;j<Math.min(w+8,30);j++)if(r[j]!=null&&r[j]>=5)ok=false;if(ok){w0=w;break;}}}return w0<0?null:w0*7+3;});
    add({years:s.years,title:`Schneeschmelze ${N.S}`,sub:'Datum, ab dem die Schneehöhe unter 5 cm bleibt',series:[{name:'Ausaperung',v:s.vals,c:c1}],tf:x=>fD(new Date(Date.UTC(2001,0,1+x))),vf:x=>fD(new Date(Date.UTC(2001,0,1+Math.round(x)))),ticks:[31,59,90,120]});}
   {const s=yearly('S',r=>r.reduce((s,x)=>s+(x??0),0)/52);add({years:s.years,title:`Mittlere Schneehöhe ${N.S}`,sub:'cm, Jahresmittel',series:[{name:'Schneehöhe',v:s.vals,c:c1}],vf:x=>x.toFixed(1)+' cm'});}
-  {const s=yearly('B',r=>{const v=r.slice(30,39).filter(x=>x!=null);return v.reduce((a,b)=>a+b,0)/v.length;});add({years:s.years,title:'Bodenfeuchte im Spätsommer',sub:`% Speicherfüllung Aug–Sep, ${N.loc}, modelliert`,series:[{name:'Bodenfeuchte',v:s.vals,c:c1}],vf:x=>x.toFixed(0)+' %'});}
-  {const s=yearly('F',r=>{let a=0,c=0;for(const w of [...Array(13).keys(),48,49,50,51]){if(r[w]!=null){a+=r[w];c++;}}return a/c;});add({years:s.years,title:'Winterniederschlag als Schnee',sub:`geschätzter Schneeanteil Dez–Mär, ${N.T}, %`,series:[{name:'Schneeanteil',v:s.vals,c:c1}],vf:x=>x.toFixed(0)+' %'});}
+  {const s=yearly('B',r=>{const v=r.slice(30,39).filter(x=>x!=null);return v.reduce((a,b)=>a+b,0)/v.length;});add({shade:SH('B'),years:s.years,title:'Bodenfeuchte im Spätsommer',sub:`% Speicherfüllung Aug–Sep, ${N.loc}, modelliert`,series:[{name:'Bodenfeuchte',v:s.vals,c:c1}],vf:x=>x.toFixed(0)+' %'});}
+  {const s=yearly('F',r=>{let a=0,c=0;for(const w of [...Array(13).keys(),48,49,50,51]){if(r[w]!=null){a+=r[w];c++;}}return a/c;});add({shade:SH('F'),years:s.years,title:'Winterniederschlag als Schnee',sub:`geschätzter Schneeanteil Dez–Mär, ${N.T}, %`,series:[{name:'Schneeanteil',v:s.vals,c:c1}],vf:x=>x.toFixed(0)+' %'});}
   {const q=yearly('Q',r=>r.reduce((s,x)=>s+x,0)/52);add({years:q.years,title:`Jahresabfluss ${N.Q}`,sub:'m³/s, Jahresmittel',series:[{name:'Abfluss',v:q.vals,c:c3}],vf:x=>x.toFixed(1)+' m³/s',sm:Math.min(st.sm,9)});}
   {const q=yearly('Q',r=>{const t=r.reduce((s,x)=>s+x,0);let c=0;for(let w=0;w<NW;w++){c+=r[w];if(c>=t/2)return w*7+3;}return null;});
    add({years:q.years,title:'Abfluss-Schwerpunkt',sub:'Datum, an dem die Hälfte des Jahresabflusses durchgeflossen ist',series:[{name:'Schwerpunkt',v:q.vals,c:c3}],tf:x=>fD(new Date(Date.UTC(2001,0,1+x))),vf:x=>fD(new Date(Date.UTC(2001,0,1+Math.round(x)))),sm:Math.min(st.sm,9)});}
@@ -451,9 +455,9 @@ function drawLand(){
   const box=()=>{const d=document.createElement('div');d.className='chart';g.appendChild(d);return d;};
   const c1=css('--s1'),c2=css('--s2'),c3=css('--s3'),c4=css('--s4'),c5=css('--s5');const [a,b]=refFor(has('T')?'T':'P');
   if(D.ty){const [A]=cmp(D.ty,D.ta,a,b,RECENT);if(A!=null){
-    add({years:D.ty,title:'Höhenverschiebung des Klimas',sub:`Temperaturabweichung gegenüber ${a}–${b} in Höhenmetern ausgedrückt (${LAPSE} °C pro 100 m). +300 m heisst: Es ist so warm wie früher 300 m tiefer.`,series:[{name:'Höhenverschiebung',v:D.ta.map(x=>x==null?null:(x-A)/LAPSE*100),c:c2}],zero:0,tf:x=>(x>0?'+':'')+x+' m',vf:x=>fmtSign(x,0)+' m',w:1080,h:220},true);
+    add({shade:SH('T'),years:D.ty,title:'Höhenverschiebung des Klimas',sub:`Temperaturabweichung gegenüber ${a}–${b} in Höhenmetern ausgedrückt (${LAPSE} °C pro 100 m). +300 m heisst: Es ist so warm wie früher 300 m tiefer.`,series:[{name:'Höhenverschiebung',v:D.ta.map(x=>x==null?null:(x-A)/LAPSE*100),c:c2}],zero:0,tf:x=>(x>0?'+':'')+x+' m',vf:x=>fmtSign(x,0)+' m',w:1080,h:220},true);
     const [B]=cmp(D.ty,D.ta,RECENT[0],RECENT[1],RECENT);drawProfile(box(),B!=null?(B-A)/LAPSE*100:0);}
-    add({years:D.ty,title:'Nullgradgrenze im Winter',sub:`Höhe, auf der das Dez–Feb-Mittel 0 °C beträgt, geschätzt aus ${N.T} (${ELEV.T??'?'} m) mit ${LAPSE} °C/100 m. Darunter fällt Niederschlag zunehmend als Regen.`,series:[{name:'Nullgradgrenze',v:D.h0,c:c1}],vf:x=>Math.round(x)+' m',tf:x=>x+' m'});}
+    add({shade:SH('T'),years:D.ty,title:'Nullgradgrenze im Winter',sub:`Höhe, auf der das Dez–Feb-Mittel 0 °C beträgt, geschätzt aus ${N.T} (${ELEV.T??'?'} m) mit ${LAPSE} °C/100 m. Darunter fällt Niederschlag zunehmend als Regen.`,series:[{name:'Nullgradgrenze',v:D.h0,c:c1}],vf:x=>Math.round(x)+' m',tf:x=>x+' m'});}
   const A=V.T&&V.T.ann;
   if(A&&A.year.length){
     add({years:A.year,title:'Vegetationsperiode: Beginn und Ende',sub:'Beginn: erste 6 Tage in Folge über 5 °C; Ende: erste 6 Tage in Folge unter 5 °C ab Juli',series:[{name:'Ende',v:A.ve,c:c2},{name:'Beginn',v:A.vs,c:c3}],tf:doyD,vf:doyD,ticks:[31,90,151,212,273,334],rightPad:40,legend:true});
@@ -462,7 +466,7 @@ function drawLand(){
     add({years:A.year,title:'Letzter Frost im Frühling',sub:'Datum des letzten Tages mit Minimum unter 0 °C vor Juli',series:[{name:'Letzter Frost',v:A.lastFrost,c:c1}],tf:doyD,vf:doyD});
     add({years:A.year,title:'Hitze',sub:'Sommertage (Maximum ≥ 25 °C), Hitzetage (≥ 30 °C) und Tropennächte (Minimum ≥ 20 °C) pro Jahr',series:[{name:'Sommertage',v:A.summer,c:c4},{name:'Hitzetage',v:A.hot,c:c2},{name:'Tropennächte',v:A.trop,c:c5}],vf:x=>x.toFixed(1)+' Tage',rightPad:70,legend:true});}
   if(D.mon){drawSpei(box(),speiGrid(D.mon,a,b));
-    add({years:D.by,title:'Sommer-Wasserbilanz',sub:`Niederschlag ${N.P} minus geschätzte Verdunstung, Juni–August, mm. Unter null verliert der Boden über den Sommer Wasser.`,series:[{name:'Wasserbilanz',v:D.bal,c:c1}],zero:0,vf:x=>Math.round(x)+' mm'});}
+    add({shade:SH('B'),years:D.by,title:'Sommer-Wasserbilanz',sub:`Niederschlag ${N.P} minus geschätzte Verdunstung, Juni–August, mm. Unter null verliert der Boden über den Sommer Wasser.`,series:[{name:'Wasserbilanz',v:D.bal,c:c1}],zero:0,vf:x=>Math.round(x)+' mm'});}
   const AP=V.P&&V.P.ann;
   if(AP&&AP.year.length)add({years:AP.year,title:'Längste Trockenperiode Apr–Sep',sub:`Tage in Folge mit weniger als 1 mm, ${N.P}`,series:[{name:'Trockenperiode',v:AP.dry,c:c2}],vf:x=>Math.round(x)+' Tage'});
   if(D.qy){
@@ -470,7 +474,21 @@ function drawLand(){
     add({years:D.qy,title:'Wann ist das Wasser am tiefsten?',sub:'Datum des tiefsten Wochenmittels. Alpine Flüsse haben ihr Minimum im Winter; rückt es in den Spätsommer, prägen Regen und Verdunstung den Fluss stärker als Schnee.',series:[{name:'Minimum',v:D.qtw,c:c1}],tf:doyD,vf:doyD,ticks:[31,120,212,304],sm:Math.min(st.sm,7)});}
 }
 
-function all(){if(!has('T')&&!has('P'))return;setWhere();updateVarButtons();draw();drawLand();drawJG();drawScatter();drawCum();drawSeg();drawCharts();}
+
+/* ---------- warnings: reference period not covered by measurements ---------- */
+function measuredYears(k,a,b){const v=V[k];if(!v)return 0;const rec=v.recon?v.recon.y1:-1e9;let n=0;for(let y=Math.max(a,v.y0);y<=Math.min(b,v.y1);y++){if(y<=rec)continue;const r=v.g[y-v.y0];if(r&&r.filter(x=>x!=null).length>=40)n++;}return n;}
+function refWarnings(){
+  const a=st.r0,b=st.r0+st.rl-1,need=Math.max(10,Math.round(Math.min(st.rl,30)*0.67)),msgs=[];
+  for(const k of ['T','P','S','Q']){if(!has(k))continue;const v=V[k],n=measuredYears(k,a,b),[ra,rb,fb]=refFor(k);
+    if(v.recon&&n<need){msgs.push(`<b>${META[k].name} ${N[k]}</b>: gemessen erst ab ${v.recon.y1+1}; ${a}–${b} ist aus ${v.recon.src} rekonstruiert (blass dargestellt).`);continue;}
+    if(n<need)msgs.push(`<b>${META[k].name} ${N[k]}</b>: nur ${n} gemessene Jahre in ${a}–${b} (Messung ab ${v.y0})${fb?`, es wird ersatzweise ${ra}–${rb} verwendet`:''}. Vergleiche mit der Referenz sind ${n<5?'nicht':'nur eingeschränkt'} aussagekräftig.`);}
+  const tp=msgs.some(m=>(m.includes('<b>Temperatur')||m.includes('<b>Niederschlag'))&&!m.includes('rekonstruiert')),sq=msgs.some(m=>m.includes('<b>Schneehöhe')||m.includes('<b>Abfluss'));
+  const hint=(tp?'<br>Abhilfe für Temperatur und Niederschlag: «Kurze Reihen ergänzen» auf «Region» oder «Schweiz» stellen, eine Station mit längerer Messreihe wählen oder die Referenzperiode verschieben.':'')+(sq?'<br>Schnee und Abfluss lassen sich nicht ergänzen: eine andere Station wählen oder die Referenzperiode in die Messzeit verschieben.':'');
+  const html=msgs.length?`<div class="warn"><b>Referenzperiode zu kurz belegt</b><br>${msgs.join('<br>')}${hint}</div>`:'';
+  ['refWarn','landWarn'].forEach(id=>{const el=$(id);if(el)el.innerHTML=html;});
+}
+
+function all(){if(!has('T')&&!has('P'))return;refWarnings();setWhere();updateVarButtons();draw();drawLand();drawJG();drawScatter();drawCum();drawSeg();drawCharts();}
 function updateVarButtons(){document.querySelectorAll('#varSeg button').forEach(b=>{b.hidden=!has(b.dataset.v);});document.querySelectorAll('#segVar button').forEach(b=>{b.hidden=!has(b.dataset.s);});document.querySelectorAll('#heatMode button').forEach(b=>{b.hidden=b.dataset.h!=='P'&&!has('Q');});}
 syncControls();
 let rt;window.addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(()=>{if(has('T')||has('P')){draw();drawSeg();}},120);});
@@ -480,7 +498,9 @@ new MutationObserver(all).observe(document.documentElement,{attributes:true,attr
 
 window.KK={redraw(){if(has('T')||has('P'))all();},place(){const st_=['T','P','S','Q'].filter(k=>N[k]).map(k=>META[k].name+' '+N[k]).join(', ');return (N.loc?N.loc+' · ':'')+st_;},setData(out,names,elev,loc){
   V=out;ELEV.loc=null;N={T:names.T||'',P:names.P||'',S:names.S||'',Q:names.Q||'',loc:loc&&loc.name?loc.name:''};ELEV=elev||{};
-  ELEV.loc=loc&&loc.elev!=null?loc.elev:null;buildDerived(loc&&loc.lat);finishV();
+  ELEV.loc=loc&&loc.elev!=null?loc.elev:null;buildDerived(loc&&loc.lat);
+  if(V.F&&V.T&&V.T.recon)V.F.recon=V.T.recon;const rb=[V.T,V.P].filter(x=>x&&x.recon);if(V.B&&rb.length){const r={y1:Math.max(...rb.map(x=>x.recon.y1)),src:rb.map(x=>x.recon.src).join(' / ')};V.B.recon=r;V.E.recon=r;}
+  finishV();
   const ysMin=Math.min(...Object.values(V).map(v=>v.y0));$('ys').min=ysMin;$('r0').min=ysMin;
   all();
 }};
