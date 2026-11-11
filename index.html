@@ -52,7 +52,13 @@
       <label class="ctl"><span><i class="dot" style="background:#b9a6ff"></i>Schneehöhe</span><select id="selS"></select></label>
       <label class="ctl"><span><i class="dot" style="background:#3fbf8f"></i>Abfluss</span><select id="selQ"></select></label>
       <p class="note" id="selNote"></p>
-      <p class="note">Vorschläge: Stationen im Suchradius, mit ähnlicher Höhe und langer Messreihe; homogenisierte Temperatur und, wenn eingeschaltet, Stationen im selben Flussgebiet (gleiches Gewässersystem, fluss­auf- oder ‑abwärts) werden bevorzugt. ◆ = im selben Flussgebiet.</p>
+      <details class="upload"><summary>Eigene Messreihe hinzufügen (CSV)</summary>
+        <p class="note">Für Stationen von Kanton, Gemeinde, Hochschule oder privat, deren Daten du hast. CSV mit Datumsspalte und mindestens einer Spalte Temperatur (°C), Niederschlag (mm) oder Schneehöhe (cm); Tages- oder Stundenwerte, Trennzeichen ; , oder Tab. Spaltennamen wie «Datum», «Temperatur», «Tmin», «Tmax», «Niederschlag», «Schnee» oder die MeteoSchweiz-Kürzel werden erkannt. Die Station wird am gewählten Ort eingetragen. Die Datei bleibt in deinem Browser.</p>
+        <div class="controls"><label class="ctl"><span>Name</span><input id="upName" type="search" placeholder="z. B. ANU Rothenbrunnen"></label><label class="ctl"><span>Höhe m</span><input id="upElev" type="number" style="width:90px"></label></div>
+        <div class="controls"><input id="upFile" type="file" accept=".csv,.txt,text/csv"><button class="btn" id="upAdd" type="button">Hinzufügen</button></div>
+        <p class="note" id="upNote"></p>
+      </details>
+      <p class="note">Vorschläge: Stationen im Suchradius, mit ähnlicher Höhe und langer Messreihe; homogenisierte Temperatur und, wenn eingeschaltet, Stationen im selben Flussgebiet (gleiches Gewässersystem, fluss­auf- oder ‑abwärts) werden bevorzugt. ◆ = im selben Flussgebiet. Graue Punkte auf der Karte: MeteoSchweiz, ocker: Agrometeo (Agroscope und kantonale Fachstellen), blau: Abfluss BAFU.</p>
     </div>
   </div>
 </section>
@@ -157,6 +163,8 @@
     <summary>Daten und Methode</summary>
     <ul>
       <li><b>Wetterdaten:</b> werden bei jeder Abfrage live von MeteoSchweiz Open Data (data.geo.admin.ch) geladen und im Browser zu Wochenwerten verrechnet: SwissMetNet, Niederschlags- und Schneemessnetz sowie Swiss NBCN. Temperatur wird, wo vorhanden, aus den homogenisierten NBCN-Reihen genommen. Niederschlag und Schnee wie gemessen.</li>
+      <li><b>Weitere Messnetze:</b> Zusätzlich werden die rund 200 Stationen von <a href="https://www.agrometeo.ch" target="_blank" rel="noopener">Agrometeo</a> live abgefragt (Agroscope und kantonale Fachstellen für Pflanzenschutz, z. B. Cazis im Domleschg). Sie messen meist erst seit 2003–2010, liefern aber Tagesmittel, Minimum, Maximum und Niederschlag. Für eine Referenzperiode wie 1961–1990 sind sie zu kurz: Das Tool warnt dann, und «Kurze Reihen ergänzen» rekonstruiert die Referenz aus MeteoSchweiz-Langzeitstationen. Nicht frei zugänglich und deshalb nicht eingebunden sind u. a. die Stationen der kantonalen Ämter (z. B. ANU Graubünden, Rothenbrunnen), private Netze (Meteotest, MeteoNews, SRF Meteo, Netatmo) und Hochschul-Messnetze. Das IMIS-Netz von WSL/SLF ist offen, erlaubt aber keine Abfrage aus dem Browser; es könnte wie der Abfluss wöchentlich vorbereitet werden. Daten, die du von solchen Stellen erhältst, lassen sich als CSV unter «Eigene Messreihe hinzufügen» einlesen.</li>
+      <li><b>MeteoSchweiz-Stationen im Domleschg:</b> Thusis (THS, Niederschlag seit 1892, Schnee seit 1968) und Rothenbrunnen (ROT, Niederschlag seit 1970) sind Niederschlagsstationen ohne Temperaturmessung. Für die Temperatur wird deshalb Agrometeo Cazis oder eine weiter entfernte MeteoSchweiz-Station vorgeschlagen.</li>
       <li><b>Abfluss:</b> BAFU, Tagesmittel aus den öffentlich publizierten Jahrestabellen (hydrodaten.admin.ch), in der Regel ab 1993. Das BAFU erlaubt keine direkte Abfrage aus dem Browser; die Tabellen werden deshalb einmal pro Woche von einer GitHub Action ausgelesen und als kleine Wochenwerte im Repository abgelegt. Viele Flüsse sind durch Kraftwerke und Seeregulierung beeinflusst; das Einzugsgebiet steht in der Stationsliste.</li>
       <li><b>Wochen:</b> 52 Wochen ab 1. Januar, die letzten 1–2 Tage des Jahres zählen zur Woche 52. Temperatur und Schnee als Wochenmittel, Niederschlag als Wochensumme, Abfluss als Wochenmittel.</li>
       <li><b>Referenz:</b> frei wählbar, Standard 1961–1990. Liegt sie ausserhalb einer Messreihe, wird für diese Grösse der früheste verfügbare Zeitraum gleicher Länge verwendet.</li>

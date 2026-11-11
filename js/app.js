@@ -48,8 +48,35 @@ function weekGrid(daily,how){ // daily: [[y,doy,value]] -> {y0,g}
   const g=[];for(let y=ys[0];y<=ys[ys.length-1];y++){const a=acc[y];g.push(a?a.map(([s,n])=>n<4?null:how==='sum7'?Math.round(s*7/n*10)/10:Math.round(s/n*10)/10):Array(NWK).fill(null));}
   return {y0:ys[0],g};
 }
+/* ---------- further networks: Agrometeo (Agroscope & cantons), own CSV ---------- */
+const AGRO='https://www.agrometeo.ch/backend/api/';
+const SRCNAME={meteoswiss:'MeteoSchweiz',agrometeo:'Agrometeo',user:'eigene Daten'};
+const titleCase=t=>t.toLowerCase().replace(/(^|[\s\-\/(])([a-zäöüéèà])/g,(m,a,b)=>a+b.toUpperCase());
+async function agroStations(){
+  const j=await jget(AGRO+'stations?lang=de');const now=new Date(),cut=now.getTime()-90*864e5;
+  return (j.data||[]).filter(s=>s.active&&s.data_until&&Date.parse(s.data_until)>cut&&s.into_service_at).map(s=>{
+    const d0=new Date(s.into_service_at),y0=d0.getUTCMonth()>0||d0.getUTCDate()>1?d0.getUTCFullYear()+1:d0.getUTCFullYear(),y1=now.getFullYear();
+    return {id:'AG'+s.id,agId:s.id,src:'agrometeo',name:titleCase(s.name),kt:'',lat:+s.lat_dec,lon:+s.long_dec,elev:s.altitude,since:s.into_service_at,v:{T:[y0,y1,0,'agrometeo','1'],P:[y0,y1,0,'agrometeo','6']}};})
+    .filter(s=>isFinite(s.lat)&&isFinite(s.lon)&&s.lat>45&&s.lat<48.5);
+}
+const agroCache={};
+function agroDaily(s){
+  if(agroCache[s.id])return agroCache[s.id];
+  const to=new Date().toISOString().slice(0,10);
+  const u=`${AGRO}meteo/data?from=${s.since}&to=${to}&scale=day&sensors=${encodeURIComponent('1:avg,1:min,1:max,6:sum')}&stations=${s.agId}`;
+  return agroCache[s.id]=jget(u).then(j=>{const T={},P={};const a=s.agId;
+    for(const r of j.data||[]){const y=+r.date.slice(0,4),m=+r.date.slice(5,7),d=+r.date.slice(8,10);const doy=Math.round((Date.UTC(y,m-1,d)-Date.UTC(y,0,1))/864e5);
+      const num=v=>v===''||v==null?null:+v;const tm=num(r[`${a}_1_avg`]),tn=num(r[`${a}_1_min`]),tx=num(r[`${a}_1_max`]),pp=num(r[`${a}_6_sum`]);
+      if(tm!=null){const e=T[y]||(T[y]={mean:new Array(366).fill(null),min:new Array(366).fill(null),max:new Array(366).fill(null)});e.mean[doy]=tm;e.min[doy]=tn;e.max[doy]=tx;}
+      if(pp!=null){const e=P[y]||(P[y]={mean:new Array(366).fill(null),min:[],max:[]});e.mean[doy]=pp;}}
+    return {T,P};});
+}
+function extToSeries(ext,k){const daily=[];for(const y in ext){const m=ext[y].mean;for(let i=0;i<m.length;i++)if(m[i]!=null)daily.push([+y,i,m[i]]);}
+  const gr=weekGrid(daily,k==='P'?'sum7':'mean');if(!gr)return null;gr.ann=k==='T'?annualT(ext):k==='P'?annualP(ext):null;return gr;}
 async function metSeries(id,k){
-  const s=ST.met.find(x=>x.id===id);if(!s||!s.v[k])return null;const [,, ,coll,col]=s.v[k];const ab=id.toLowerCase();
+  const s=ST.met.find(x=>x.id===id);if(!s||!s.v[k])return null;
+  if(s.src==='agrometeo'){const d=await agroDaily(s);return extToSeries(d[k]||{},k);}
+  if(s.src==='user')return s.data[k]?extToSeries(s.data[k],k):null;const [,, ,coll,col]=s.v[k];const ab=id.toLowerCase();
   const parts=await Promise.all(['historical','recent'].map(p=>tget(`${MS}${coll}/${ab}/${coll}_${ab}_d_${p}.csv`)));
   const daily=[],ext={};  // ext[year] = {mean:[],min:[],max:[]} per day of year (T) or {p:[]} (P)
   const cMin=col.replace(/d0$/,'dn'),cMax=col.replace(/d0$/,'dx');
@@ -136,7 +163,7 @@ function candidates(k){
   if(k==='Q'){return ST.hydro.map(s=>{const d=km(LOC.lat,LOC.lon,s.lat,s.lon),n=s.y[1]-s.y[0]+1,sb=sameB(s),onR=sb&&onMainRiver(s);
       return {s,d,sb,onR,score:d-Math.min(n,40)/8+(pb&&!sb?R:0)-(pb&&onR?8:0)};})
     .filter(o=>o.d<=R).sort((a,b)=>a.score-b.score).slice(0,10);}
-  return ST.met.filter(s=>s.v&&s.v[k]&&len(s,k)>=15).map(s=>{
+  return ST.met.filter(s=>s.v&&s.v[k]&&(len(s,k)>=15||(s.src&&s.src!=='meteoswiss'&&len(s,k)>=5))).map(s=>{
     const d=km(LOC.lat,LOC.lon,s.lat,s.lon),dh=h==null||s.elev==null?0:Math.abs(s.elev-h),n=len(s,k),hom=s.v[k][2],sb=sameB(s);
     let score;
     if(k==='T')score=d+dh/40-(hom?6:0)-Math.min(n,150)/30;
@@ -147,7 +174,7 @@ function candidates(k){
 }
 function optLabel(k,o){const s=o.s,mark=o.sb?'◆ ':'';
   if(k==='Q')return `${mark}${s.name} · ${o.d.toFixed(0)} km${o.onR?' · am '+MAINRIVER.name:''} · ${s.y[0]}–${s.y[1]}${s.area?` · ${Math.round(s.area)} km²`:''}`;
-  const v=s.v[k];return `${mark}${s.name} (${s.id}) · ${o.d.toFixed(0)} km · ${s.elev??'?'} m · ${v[0]}–${v[1]}${v[2]?' · homogenisiert':''}`;}
+  const v=s.v[k],tag=s.src&&s.src!=='meteoswiss'?` · ${SRCNAME[s.src]}`:` (${s.id})`;return `${mark}${s.name}${tag} · ${o.d.toFixed(0)} km · ${s.elev??'?'} m · ${v[0]}–${v[1]}${v[2]?' · homogenisiert':''}`;}
 
 function fillSelects(preset){
   for(const k of ['T','P','S','Q']){
@@ -174,8 +201,8 @@ function initMap(){
   basinLayer=L.layerGroup().addTo(map);bilLayer=L.layerGroup().addTo(map);riverLayer=L.layerGroup().addTo(map);
   layerMet=L.layerGroup().addTo(map);layerQ=L.layerGroup().addTo(map);selLayer=L.layerGroup().addTo(map);
   if(document.getElementById('chkRivers').checked)riverTiles.addTo(map);
-  for(const s of ST.met)L.circleMarker([s.lat,s.lon],{radius:s.v.T&&s.v.T[2]?3.5:2.5,weight:1,color:'#8d8d8d',fillColor:s.v.T?'#eeeeee':'#666666',fillOpacity:0.9})
-    .bindTooltip(`${s.name} (${s.id}) · ${s.elev??'?'} m<br>${Object.entries(s.v).map(([k,v])=>`${LAB[k]} ${v[0]}–${v[1]}${v[2]?' hom.':''}`).join('<br>')}`).addTo(layerMet);
+  for(const s of ST.met)L.circleMarker([s.lat,s.lon],s.src==='agrometeo'?{radius:2.8,weight:1,color:'#d7b66d',fillColor:'#2a2414',fillOpacity:0.9}:s.src==='user'?{radius:4,weight:2,color:'#ccccff',fillColor:'#000',fillOpacity:1}:{radius:s.v.T&&s.v.T[2]?3.5:2.5,weight:1,color:'#8d8d8d',fillColor:s.v.T?'#eeeeee':'#666666',fillOpacity:0.9})
+    .bindTooltip(`${s.name} ${s.src&&s.src!=='meteoswiss'?'· '+SRCNAME[s.src]:'('+s.id+')'} · ${s.elev??'?'} m<br>${Object.entries(s.v).map(([k,v])=>`${LAB[k]} ${v[0]}–${v[1]}${v[2]?' hom.':''}`).join('<br>')}`).addTo(layerMet);
   for(const s of ST.hydro)L.circleMarker([s.lat,s.lon],{radius:3.5,weight:1,color:'#3f87c4',fillColor:'#9fdcff',fillOpacity:0.95})
     .bindTooltip(`${s.name} (${s.id})<br>Abfluss ${s.y[0]}–${s.y[1]}${s.area?`<br>Einzugsgebiet ${Math.round(s.area)} km²`:''}`).addTo(layerQ);
   map.on('click',e=>setLocation(e.latlng.lat,e.latlng.lng));
@@ -223,7 +250,7 @@ async function loadData(){
   try{
     const out={},names={},elev={};
     const jobs=['T','P','S'].filter(k=>SEL[k]).map(async k=>{const key=k+SEL[k];if(!cache[key])cache[key]=metSeries(SEL[k],k);const gr=await cache[key];
-      const s=ST.met.find(x=>x.id===SEL[k]);if(gr)out[k]={y0:gr.y0,g:gr.g,ann:gr.ann};if(k==='T')elev.Th=!!(s&&s.v.T&&s.v.T[2]);names[k]=s?s.name:SEL[k];elev[k]=s?s.elev:null;});
+      const s=ST.met.find(x=>x.id===SEL[k]);if(gr)out[k]={y0:gr.y0,g:gr.g,ann:gr.ann};if(k==='T')elev.Th=!!(s&&s.v.T&&s.v.T[2]);names[k]=s?s.name+(s.src&&s.src!=='meteoswiss'?` (${SRCNAME[s.src]})`:''):SEL[k];elev[k]=s?s.elev:null;});
     if(SEL.Q)jobs.push(loadSeries('q',SEL.Q).then(j=>{out.Q={y0:j.y0,g:j.g};const s=ST.hydro.find(x=>x.id===SEL.Q);names.Q=s?s.name:SEL.Q;}).catch(()=>{}));
     await Promise.all(jobs);
     if(FILL!=='warn')for(const k of ['T','P'])if(out[k]){try{await extendSeries(k,out[k]);}catch(e){console.warn('extend',e);}}
@@ -238,7 +265,7 @@ async function loadData(){
 let FILL='warn';try{FILL=localStorage.getItem('climate-data-fill')||'warn';}catch(e){}
 const CH_IDS=['BAS','BER','GVE','LUG','SIO','DAV','SMA','NEU','LUZ','CHU','STG','ALT'];
 function regionStations(k,tgtId,y0){
-  const long=ST.met.filter(s=>s.id!==tgtId&&s.v[k]&&s.v[k][0]<=Math.min(1931,y0-10)&&s.v[k][1]>=2020);
+  const long=ST.met.filter(s=>s.src==='meteoswiss'&&s.id!==tgtId&&s.v[k]&&s.v[k][0]<=Math.min(1931,y0-10)&&s.v[k][1]>=2020);
   if(FILL==='ch'){const l=long.filter(s=>CH_IDS.includes(s.id));return (k==='T'?l.filter(s=>s.v.T[2]):l).slice(0,8);}
   const c=long.map(s=>({s,d:km(LOC.lat,LOC.lon,s.lat,s.lon)})).filter(o=>o.d<=120);
   c.sort((a,b)=>(a.d-(k==='T'&&a.s.v.T[2]?15:0))-(b.d-(k==='T'&&b.s.v.T[2]?15:0)));return c.slice(0,3).map(o=>o.s);
@@ -263,6 +290,41 @@ async function extendSeries(k,tgt){
 function initFill(){const seg=document.getElementById('fillSeg');if(!seg)return;const sync=()=>seg.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.f===FILL)));sync();
   seg.querySelectorAll('button').forEach(b=>b.onclick=()=>{FILL=b.dataset.f;try{localStorage.setItem('climate-data-fill',FILL);}catch(e){}sync();
     for(const key in cache)if(key.startsWith('T')||key.startsWith('P'))delete cache[key];if(FILL==='ch')document.getElementById('selNote').textContent='Lädt Schweizer Langzeitstationen …';loadData();});}
+
+/* ---------- own measurement series (CSV) ---------- */
+function parseCSV(text){
+  const lines=text.replace(/^﻿/,'').split(/\r?\n/).filter(l=>l.trim());if(lines.length<20)throw new Error('zu wenige Zeilen');
+  const delim=[';','\t',','].map(d=>[d,lines[0].split(d).length]).sort((a,b)=>b[1]-a[1])[0][0];
+  const head=lines[0].split(delim).map(h=>h.trim().toLowerCase().replace(/"/g,''));
+  const di=head.findIndex(h=>/date|datum|time|zeit|timestamp|tag/.test(h));if(di<0)throw new Error('keine Datumsspalte gefunden');
+  const find=re=>head.findIndex((h,i)=>i!==di&&re.test(h));
+  const col={T:find(/^(?!.*(min|max|boden|soil|dn|dx)).*(temp|tre200|ths200|°c|lufttemp|tavg|tmean|^t$)/),Tn:find(/(tmin|min.*temp|temp.*min|tre200dn|ths200dn)/),Tx:find(/(tmax|max.*temp|temp.*max|tre200dx|ths200dx)/),
+    P:find(/(nieder|precip|rre150|regen|rain|^p$|mm)/),S:find(/(schnee|snow|hto|^hs$)/)};
+  const parseDate=v=>{v=v.replace(/"/g,'').trim();let m=v.match(/^(\d{4})-(\d{2})-(\d{2})/);if(m)return [+m[1],+m[2],+m[3]];m=v.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})/);if(m)return [+m[3],+m[2],+m[1]];m=v.match(/^(\d{4})(\d{2})(\d{2})/);if(m)return [+m[1],+m[2],+m[3]];return null;};
+  const acc={};
+  for(const l of lines.slice(1)){const a=l.split(delim);const d=parseDate(a[di]||'');if(!d)continue;const key=d.join('-');const o=acc[key]||(acc[key]={d,T:[],Tn:[],Tx:[],P:[],S:[]});
+    for(const k in col){const i=col[k];if(i<0)continue;const v=parseFloat((a[i]||'').replace(',','.'));if(isFinite(v))o[k].push(v);}}
+  const ext={T:{},P:{},S:{}};const mk=()=>({mean:new Array(366).fill(null),min:new Array(366).fill(null),max:new Array(366).fill(null)});
+  for(const key in acc){const o=acc[key],[y,m,d]=o.d,doy=Math.round((Date.UTC(y,m-1,d)-Date.UTC(y,0,1))/864e5);const avg=a=>a.reduce((s,x)=>s+x,0)/a.length;
+    if(o.T.length||o.Tn.length){const e=ext.T[y]||(ext.T[y]=mk());e.mean[doy]=o.T.length?avg(o.T):(o.Tn.length&&o.Tx.length?(avg(o.Tn)+avg(o.Tx))/2:null);e.min[doy]=o.Tn.length?Math.min(...o.Tn):(o.T.length>1?Math.min(...o.T):null);e.max[doy]=o.Tx.length?Math.max(...o.Tx):(o.T.length>1?Math.max(...o.T):null);}
+    if(o.P.length){const e=ext.P[y]||(ext.P[y]=mk());e.mean[doy]=o.P.reduce((s,x)=>s+x,0);}
+    if(o.S.length){const e=ext.S[y]||(ext.S[y]=mk());e.mean[doy]=avg(o.S);}}
+  const range=k=>{const ys=Object.keys(ext[k]).map(Number).sort((a,b)=>a-b);return ys.length?[ys[0],ys[ys.length-1]]:null;};
+  return {ext,range,found:Object.keys(col).filter(k=>col[k]>=0)};
+}
+let userN=0;
+function initUpload(){
+  const btn=document.getElementById('upAdd');if(!btn)return;const note=document.getElementById('upNote');
+  btn.onclick=async()=>{const f=document.getElementById('upFile').files[0];if(!f){note.textContent='Bitte eine CSV-Datei wählen.';return;}
+    try{const r=parseCSV(await f.text());const v={};for(const k of ['T','P','S']){const rg=r.range(k);if(rg)v[k]=[rg[0],rg[1],0,'user',k];}
+      if(!Object.keys(v).length)throw new Error('keine Spalte für Temperatur, Niederschlag oder Schnee erkannt');
+      const id='USR'+(++userN),name=document.getElementById('upName').value.trim()||f.name.replace(/\.[^.]+$/,''),elev=+document.getElementById('upElev').value||LOC.elev;
+      const st={id,src:'user',name,kt:'',lat:LOC.lat,lon:LOC.lon,elev,v,data:r.ext};ST.met.push(st);
+      if(map)L.circleMarker([st.lat,st.lon],{radius:4,weight:2,color:'#ccccff',fillColor:'#000',fillOpacity:1}).bindTooltip(`${name} · eigene Daten`).addTo(layerMet);
+      const pre={};for(const k in v)pre[k]=id;fillSelects(Object.assign({T:SEL.T,P:SEL.P,S:SEL.S,Q:SEL.Q},pre));drawSelection();await loadData();
+      note.textContent=`Hinzugefügt: ${Object.keys(v).map(k=>LAB[k]+' '+v[k][0]+'–'+v[k][1]).join(', ')}. Die Daten bleiben in diesem Browserfenster und werden nicht hochgeladen.`;
+    }catch(e){note.textContent='Datei konnte nicht gelesen werden: '+e.message;}};
+}
 
 /* ---------- downloads: GeoJSON & map SVG ---------- */
 function dlJSON(obj,name){window.CDX.save(new Blob([JSON.stringify(obj)],{type:'application/geo+json'}),name);}
@@ -319,12 +381,12 @@ async function boot(){
   const q=new URLSearchParams(location.search);
   if(q.get('r'))document.getElementById('radius').value=q.get('r');
   const ro=document.getElementById('radiuso');const syncR=()=>ro.textContent=radius()+' km';syncR();
-  const [met,hyd]=await Promise.all([metStations().catch(e=>{console.error(e);return [];}),jget(DATA+'hydro.json').catch(()=>({hydro:[],updated:null}))]);
-  ST.met=met;ST.hydro=hyd.hydro||[];ST.updated=hyd.updated;
+  const [met,hyd,agro]=await Promise.all([metStations().catch(e=>{console.error(e);return [];}),jget(DATA+'hydro.json').catch(()=>({hydro:[],updated:null})),agroStations().catch(e=>{console.warn('agrometeo',e);return [];})]);
+  met.forEach(s=>s.src='meteoswiss');ST.met=met.concat(agro);ST.nAgro=agro.length;ST.hydro=hyd.hydro||[];ST.updated=hyd.updated;
   if(!ST.met.length){document.getElementById('selNote').textContent='Die Stationsliste von MeteoSchweiz konnte nicht geladen werden.';}
   document.getElementById('updated').textContent=ST.updated?ST.updated.split('-').reverse().join('.'):'–';
-  document.getElementById('nSt').textContent=`${ST.met.length} Wetterstationen (live von MeteoSchweiz), ${ST.hydro.length} Abflussstationen`;
-  initMap();initSearch();initDownloads();initFill();
+  document.getElementById('nSt').textContent=`${ST.met.length-(ST.nAgro||0)} Stationen MeteoSchweiz, ${ST.nAgro||0} Stationen Agrometeo (live), ${ST.hydro.length} Abflussstationen BAFU`;
+  initMap();initSearch();initDownloads();initFill();initUpload();
   for(const k of ['T','P','S','Q'])document.getElementById('sel'+k).addEventListener('change',e=>{SEL[k]=e.target.value||null;drawSelection();loadData();});
   let rt;document.getElementById('radius').addEventListener('input',()=>{syncR();clearTimeout(rt);rt=setTimeout(reselect,350);});
   document.getElementById('chkSameBasin').addEventListener('change',reselect);

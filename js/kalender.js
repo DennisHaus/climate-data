@@ -304,9 +304,9 @@ function drawSeg(){
   if(!has('P'))return;
   const si=segInfo(),n=si.n,cP=css('--cP'),cQ=css('--cQ');
   // ---- profile: P and Q, two periods
-  const qa=has('Q')?V.Q.y0:Math.max(V.P.y0,1961),qb=has('Q')?Math.min(V.Q.y1,2025):2025,mid=Math.floor((qa+qb)/2);const per=[[qa,mid],[mid+1,qb]];
-  const prof=(k,[a,b])=>{const acc=new Array(n).fill(0);let c=0;for(let y=a;y<=b;y++){const s=shares(k,y,si);if(!s)continue;s.forEach((x,i)=>acc[i]+=x);c++;}return acc.map(x=>x/c);};
-  const ser=[{k:'P',p:per[0],c:cP,dash:'4 3',op:0.6},{k:'P',p:per[1],c:cP},{k:'Q',p:per[0],c:cQ,dash:'4 3',op:0.6},{k:'Q',p:per[1],c:cQ}].filter(o=>has(o.k)).map(o=>Object.assign(o,{v:prof(o.k,o.p),name:`${META[o.k].name} ${o.p[0]}–${o.p[1]}`}));
+  const qa=has('Q')?Math.max(V.Q.y0,V.P.y0):Math.max(V.P.y0,1961),qb=Math.min(has('Q')?V.Q.y1:9999,V.P.y1,2025),mid=Math.floor((qa+qb)/2);const per=[[qa,mid],[mid+1,qb]];
+  const prof=(k,[a,b])=>{const acc=new Array(n).fill(0);let c=0;for(let y=a;y<=b;y++){const s=shares(k,y,si);if(!s)continue;s.forEach((x,i)=>acc[i]+=x);c++;}return c?acc.map(x=>x/c):null;};
+  const ser=[{k:'P',p:per[0],c:cP,dash:'4 3',op:0.6},{k:'P',p:per[1],c:cP},{k:'Q',p:per[0],c:cQ,dash:'4 3',op:0.6},{k:'Q',p:per[1],c:cQ}].filter(o=>has(o.k)).map(o=>Object.assign(o,{v:prof(o.k,o.p),name:`${META[o.k].name} ${o.p[0]}–${o.p[1]}`})).filter(o=>o.v);
   const el=$('segProfile'),Wd=1080,Ht=260,L=44,R=12,T=12,B=26,pw=Wd-L-R,ph=Ht-T-B;
   const all=ser.flatMap(s=>s.v);const hi=Math.max(...all)*1.08,lo=0,eq=100/n;
   const X=p=>L+p/n*pw,Y=v=>T+(1-(v-lo)/(hi-lo))*ph;
@@ -326,7 +326,7 @@ function drawSeg(){
   const mode=st.hm,ks=mode==='d'?['P','Q']:[mode];const ya=Math.max(...ks.map(k=>V[k].y0)),yb=Math.min(...ks.map(k=>Math.min(V[k].y1,2025)));
   let rows=[];const years=[];
   for(let y=ya;y<=yb;y++){let r;if(mode==='d'){const p=shares('P',y,si),q=shares('Q',y,si);r=p&&q?q.map((x,i)=>x-p[i]):null;}else r=shares(mode,y,si);years.push(y);rows.push(r);}
-  if(mode!=='d'){const [a,b2]=refFor(mode);const m=new Array(n).fill(0);let c=0;rows.forEach((r,i)=>{if(r&&years[i]>=a&&years[i]<=b2){r.forEach((x,j)=>m[j]+=x);c++;}});rows=rows.map(r=>r?r.map((x,j)=>x-m[j]/c):null);}
+  if(mode!=='d'){const [a,b2]=refFor(mode);const m=new Array(n).fill(0);let c=0;rows.forEach((r,i)=>{if(r&&years[i]>=a&&years[i]<=b2){r.forEach((x,j)=>m[j]+=x);c++;}});if(!c){rows.forEach(r=>{if(r){r.forEach((x,j)=>m[j]+=x);c++;}});}rows=rows.map(r=>r&&c?r.map((x,j)=>x-m[j]/c):null);}
   const h=(st.sm2-1)/2;const sm=rows.map((_,i)=>{const acc=new Array(n).fill(0);let c=0;for(let k=-h;k<=h;k++){const r=rows[i+k];if(r){r.forEach((x,j)=>acc[j]+=x);c++;}}return c&&rows[i]?acc.map(x=>x/c):null;});
   const vals=sm.flat().filter(x=>x!=null);const mean=vals.reduce((a,b)=>a+b,0)/vals.length;const sd=Math.sqrt(vals.reduce((a,b)=>a+(b-mean)**2,0)/vals.length);
   const lim=autoRange(vals,0.5);

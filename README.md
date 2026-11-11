@@ -22,6 +22,8 @@ Ist die gewählte Referenzperiode (Standard 1961–1990) an einer Station zu wen
 ## Daten
 
 - **MeteoSchweiz Open Data** (data.geo.admin.ch) wird **live** abgefragt: Stationsliste (~480 Stationen) und Tageswerte der gewählten Stationen werden direkt im Browser geladen und zu Wochenwerten verrechnet (rund 1 s). SwissMetNet, Niederschlags- und Schneemessnetz, Swiss NBCN (homogenisierte Temperatur).
+- **Agrometeo** (Agroscope und kantonale Fachstellen): rund 200 Stationen, live abgefragt, meist ab 2003–2010.
+- **Eigene Daten**: CSV-Upload im Browser für kantonale, kommunale oder private Stationen.
 - **BAFU Hydrodaten**: Tagesmittel Abfluss aus den publizierten Jahrestabellen (meist ab 1993). Das BAFU erlaubt keine Browser-Abfrage, deshalb liest eine GitHub Action die Tabellen einmal pro Woche aus und legt nur kleine Wochenwerte in `data/` ab (insgesamt wenige MB). Ältere Daten sind beim BAFU bestellbar.
 - Schneeanteil und Bodenfeuchte sind **abgeleitet/modelliert** (siehe «Daten und Methode» im Tool).
 
